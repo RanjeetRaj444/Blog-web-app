@@ -1,7 +1,6 @@
-import express from "express";
-import Post from "../models/Post.js";
-// import User from "../models/User.js";
-import auth from "../middleware/auth.js";
+const express = require("express");
+const Post = require("../models/Post.js");
+const auth = require("../middleware/auth.js");
 
 const router = express.Router();
 
@@ -233,4 +232,4 @@ router.delete("/:id/comments/:comment_id", auth, async (req, res) => {
   }
 });
 
-export default router;
+module.exports= router;

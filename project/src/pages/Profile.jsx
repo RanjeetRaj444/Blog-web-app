@@ -7,6 +7,7 @@ import { AuthContext } from "../context/AuthContext";
 import PostCard from "../components/posts/PostCard";
 import LoadingSpinner from "../components/ui/LoadingSpinner";
 import Button from "../components/ui/Button";
+// import { l } from "vite/dist/node/types.d-aGj9QkWt";
 
 const Profile = () => {
   const { user } = useContext(AuthContext);
@@ -18,6 +19,8 @@ const Profile = () => {
   const [bio, setBio] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const token = localStorage.getItem("token");
+  const UserId = localStorage.getItem("UserId");
+  // console.log(UserId);
 
   useEffect(() => {
     const fetchUserPosts = async () => {
@@ -36,7 +39,6 @@ const Profile = () => {
         );
         setPosts(response.data);
 
-        // Fetch user profile data
         const profileResponse = await axios.get(
           `${API_URL}/api/users/${user._id}`,
           {
@@ -247,6 +249,7 @@ const Profile = () => {
                   post={post}
                   isOwner={true}
                   onDelete={handleDeletePost}
+                  UserId={UserId}
                 />
               ))}
             </div>

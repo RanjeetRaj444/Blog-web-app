@@ -1,12 +1,13 @@
-import express from "express";
-import cors from "cors";
-import mongoose from "mongoose";
-import dotenv from "dotenv";
-import authRoutes from "./routes/auth.js";
-import postRoutes from "./routes/posts.js";
-import userRoutes from "./routes/users.js";
+const express = require("express");
+const cors = require("cors");
+const mongoose = require("mongoose");
+// const dotenv = require("dotenv");
+const authRoutes = require("./routes/auth.js");
+const postRoutes = require("./routes/posts.js");
+const userRoutes = require("./routes/users.js");
 
-dotenv.config();
+// dotenv.config();
+require("dotenv").config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -27,7 +28,7 @@ app.get("/", (req, res) => {
   res.send("Panini8 Blog API is running");
 });
 
-app.use((err, req, res) => {
+app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).send({ message: "Something went wrong!" });
 });

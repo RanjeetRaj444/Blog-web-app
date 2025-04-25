@@ -13,7 +13,8 @@ const Home = () => {
   const [allTags, setAllTags] = useState([]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const token = localStorage.getItem("token");
-
+  const UserId = localStorage.getItem("UserId");
+  // console.log(UserId);
   useEffect(() => {
     const fetchPosts = async () => {
       try {
@@ -25,7 +26,6 @@ const Home = () => {
           },
         });
         setPosts(response.data);
-
         const tags = response.data.reduce((acc, post) => {
           post.tags.forEach((tag) => {
             if (!acc.includes(tag)) {
@@ -45,16 +45,20 @@ const Home = () => {
     };
 
     fetchPosts();
-  }, []);
+  }, [UserId]);
 
   const handleLike = async (postId) => {
     try {
-      await axios.post(`${API_URL}/api/posts/${postId}/like`, {},{
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      await axios.post(
+        `${API_URL}/api/posts/${postId}/like`,
+        {},
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
     } catch (err) {
       console.error("Error liking post:", err);
     }
@@ -151,6 +155,7 @@ const Home = () => {
               post={post}
               onLike={handleLike}
               onDelete={handleDelete}
+              UserId={UserId}
             />
           ))}
         </div>

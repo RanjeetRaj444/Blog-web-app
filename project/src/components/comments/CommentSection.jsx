@@ -19,8 +19,6 @@ const CommentSection = ({
     try {
       setIsSubmitting(true);
       await onAddComment(postId, content);
-      // In a real app we would get the new comment from the server response
-      // For now we'll simulate it with a local object
       const newComment = {
         _id: `temp-${Date.now()}`,
         content,

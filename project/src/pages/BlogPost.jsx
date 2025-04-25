@@ -18,9 +18,9 @@ const BlogPost = () => {
   const [isLiked, setIsLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
   const { user } = useContext(AuthContext);
-  // const navigate = useNavigate();
   const token = localStorage.getItem("token");
-
+  const UserId = localStorage.getItem("UserId");
+  // console.log(UserId);
   useEffect(() => {
     const fetchPost = async () => {
       try {
@@ -45,16 +45,32 @@ const BlogPost = () => {
     if (id) {
       fetchPost();
     }
+    if (post?.likes && UserId) {
+      const isLikedByUser = post.likes.includes(UserId);
+      setIsLiked(isLikedByUser);
+    }
   }, [id]);
+  useEffect(() => {
+    if (post?.likes && UserId) {
+      const isLikedByUser = post.likes.some(
+        (id) => String(id) === String(UserId)
+      );
+      setIsLiked(isLikedByUser);
+    }
+  }, [post, UserId]);
 
   const handleLike = async () => {
     try {
-      await axios.post(`${API_URL}/api/posts/${id}/like`,{}, {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      await axios.post(
+        `${API_URL}/api/posts/${id}/like`,
+        {},
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
       setIsLiked(!isLiked);
       setLikesCount((prev) => (isLiked ? prev - 1 : prev + 1));
     } catch (err) {
@@ -118,7 +134,6 @@ const BlogPost = () => {
   }
 
   const isOwner = user && post.author._id === user._id;
-
   return (
     <div className="container-custom py-8 animate-fade-in">
       <div className="max-w-3xl mx-auto">

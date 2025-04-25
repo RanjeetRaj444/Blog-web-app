@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+const mongoose = require("mongoose");
 
 const CommentSchema = new mongoose.Schema({
   content: {
@@ -59,4 +59,4 @@ PostSchema.pre("save", function (next) {
 
 const Post = mongoose.model("Post", PostSchema);
 
-export default Post;
+module.exports= Post;

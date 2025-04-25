@@ -43,7 +43,7 @@ export const AuthProvider = ({ children }) => {
     loadUser();
   }, [token]);
 
-  // Login user
+
   const login = async (email, password) => {
     try {
       const response = await axios.post(`${API_URL}/api/auth/login`, {
@@ -51,6 +51,7 @@ export const AuthProvider = ({ children }) => {
         password,
       });
       localStorage.setItem("token", response.data.token);
+      localStorage.setItem("UserId", response.data.user._id);
       setToken(response.data.token);
       setUser(response.data.user);
     } catch (error) {
@@ -58,7 +59,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Register user
+
   const register = async (name, email, password) => {
     try {
       const response = await axios.post(`${API_URL}/api/auth/register`, {
@@ -74,9 +75,9 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Logout user
   const logout = () => {
     localStorage.removeItem("token");
+    localStorage.removeItem("UserId");
     setToken(null);
     setUser(null);
   };

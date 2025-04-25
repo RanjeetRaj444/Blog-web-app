@@ -6,7 +6,6 @@ import LoadingSpinner from './components/ui/LoadingSpinner';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import { AuthProvider } from './context/AuthContext';
 
-// Lazy loaded components
 const Home = lazy(() => import('./pages/Home'));
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
