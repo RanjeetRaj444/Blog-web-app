@@ -2,6 +2,13 @@
 
 A full-featured blog platform built with the MERN stack (MongoDB, Express.js, React, Node.js) that allows users to create, share, and interact with blog posts.
 
+## URL
+
+- ## **Frontend URL**
+  - https://panini8blogplateform.netlify.app/
+- **Backend URL**
+  - https://blog-web-app-qbiy.onrender.com
+
 ## Features
 
 - **User Authentication**
