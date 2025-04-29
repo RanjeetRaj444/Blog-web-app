@@ -14,7 +14,6 @@ const Home = () => {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const token = localStorage.getItem("token");
   const UserId = localStorage.getItem("UserId");
-  // console.log(UserId);
   useEffect(() => {
     const fetchPosts = async () => {
       try {
@@ -45,7 +44,7 @@ const Home = () => {
     };
 
     fetchPosts();
-  }, [UserId]);
+  }, [UserId, token]);
 
   const handleLike = async (postId) => {
     try {
