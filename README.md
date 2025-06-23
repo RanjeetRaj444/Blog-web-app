@@ -32,6 +32,7 @@ A full-featured blog platform built with the MERN stack (MongoDB, Express.js, Re
   - Comment on posts
   - Delete your own comments
   - User profiles with bio
+  - Chat with AI.
 
 - **Modern UI/UX**
   - Responsive design for all devices

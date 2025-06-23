@@ -1,9 +1,10 @@
-import React, { useRef } from "react";
+import React, { useRef, useEffect } from "react";
 
 const ChatBot = ({ isOpen, onClose }) => {
   const [chatHistory, setChatHistory] = React.useState([]);
-
   const message = useRef();
+  const chatBodyRef = useRef(null);
+
   function handleSubmit(e) {
     e.preventDefault();
     const userMessage = message.current.value.trim();
@@ -12,7 +13,7 @@ const ChatBot = ({ isOpen, onClose }) => {
     setChatHistory((pre) => [
       ...pre,
       {
-        role: "user", // changed from "User" to "user" for consistency
+        role: "user",
         message: userMessage,
       },
     ]);
@@ -22,13 +23,13 @@ const ChatBot = ({ isOpen, onClose }) => {
       setChatHistory((pre) => [
         ...pre,
         {
-          role: "bot", // changed from "mode" to "bot"
+          role: "bot",
           message: "Thinking...",
         },
       ]);
       generateBotResponse([
         ...chatHistory,
-        { role: "user", message: userMessage }, // pass the actual user message
+        { role: "user", message: userMessage },
       ]);
     }, 1000);
   }
@@ -40,7 +41,7 @@ const ChatBot = ({ isOpen, onClose }) => {
     }));
 
     const requestOptions = {
-      method: "POST", // changed from "GET" to "POST"
+      method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
@@ -58,7 +59,6 @@ const ChatBot = ({ isOpen, onClose }) => {
 
       // Remove the "Thinking..." message and add the real bot response
       setChatHistory((pre) => {
-        // Remove last "bot" message (Thinking...)
         const updated = [...pre];
         const lastBotIndex = updated.map((msg) => msg.role).lastIndexOf("bot");
         if (lastBotIndex !== -1) {
@@ -74,7 +74,6 @@ const ChatBot = ({ isOpen, onClose }) => {
       });
     } catch (error) {
       setChatHistory((pre) => {
-        // Remove last "bot" message (Thinking...)
         const updated = [...pre];
         const lastBotIndex = updated.map((msg) => msg.role).lastIndexOf("bot");
         if (lastBotIndex !== -1) {
@@ -92,6 +91,13 @@ const ChatBot = ({ isOpen, onClose }) => {
     }
   }
 
+  // Auto-scroll to bottom when chatHistory changes
+  useEffect(() => {
+    if (chatBodyRef.current) {
+      chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
+    }
+  }, [chatHistory]);
+
   if (!isOpen) return null;
   return (
     <div className="fixed bottom-4 right-4 z-50">
@@ -108,7 +114,10 @@ const ChatBot = ({ isOpen, onClose }) => {
         </div>
 
         {/* Chat Messages */}
-        <div className="flex-1 overflow-y-auto px-4 py-2 space-y-2 bg-gray-50">
+        <div
+          ref={chatBodyRef}
+          className="flex-1 overflow-y-auto px-4 py-2 space-y-2 bg-gray-50 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100"
+        >
           {/* Example messages */}
           <div className="text-left">
             <div className="flex items-center bg-primary-100 p-2 rounded max-w-[80%]">
