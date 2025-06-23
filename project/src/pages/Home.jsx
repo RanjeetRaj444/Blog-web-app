@@ -1,20 +1,24 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Filter } from "lucide-react";
 import axios from "axios";
 import { API_URL } from "../utils/constants";
 import PostCard from "../components/posts/PostCard";
 import LoadingSpinner from "../components/ui/LoadingSpinner";
 
+const tagButtonBase =
+  "px-3 py-1.5 rounded-full text-sm font-medium transition";
+
 const Home = () => {
   const [posts, setPosts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedTag, setSelectedTag] = useState(null);
-  const [allTags, setAllTags] = useState([]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const token = localStorage.getItem("token");
   const UserId = localStorage.getItem("UserId");
+
   useEffect(() => {
+    let ignore = false;
     const fetchPosts = async () => {
       try {
         setIsLoading(true);
@@ -24,66 +28,76 @@ const Home = () => {
             Authorization: `Bearer ${token}`,
           },
         });
-        setPosts(response.data);
-        const tags = response.data.reduce((acc, post) => {
-          post.tags.forEach((tag) => {
-            if (!acc.includes(tag)) {
-              acc.push(tag);
-            }
-          });
-          return acc;
-        }, []);
-
-        setAllTags(tags);
+        if (!ignore) setPosts(response.data);
       } catch (err) {
-        setError("Failed to fetch posts. Please try again later.");
-        console.error(err);
+        if (!ignore) {
+          setError("Failed to fetch posts. Please try again later.");
+          console.error(err);
+        }
       } finally {
-        setIsLoading(false);
+        if (!ignore) setIsLoading(false);
       }
     };
-
     fetchPosts();
+    return () => {
+      ignore = true;
+    };
   }, [UserId, token]);
 
-  const handleLike = async (postId) => {
-    try {
-      await axios.post(
-        `${API_URL}/api/posts/${postId}/like`,
-        {},
-        {
+  const allTags = useMemo(() => {
+    const tagSet = new Set();
+    posts.forEach((post) => {
+      post.tags?.forEach((tag) => tagSet.add(tag));
+    });
+    return Array.from(tagSet);
+  }, [posts]);
+
+  const filteredPosts = useMemo(
+    () =>
+      selectedTag
+        ? posts.filter((post) => post.tags?.includes(selectedTag))
+        : posts,
+    [posts, selectedTag]
+  );
+
+  const handleLike = useCallback(
+    async (postId) => {
+      try {
+        await axios.post(
+          `${API_URL}/api/posts/${postId}/like`,
+          {},
+          {
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+      } catch (err) {
+        console.error("Error liking post:", err);
+      }
+    },
+    [token]
+  );
+
+  const handleDelete = useCallback(
+    async (postId) => {
+      try {
+        await axios.delete(`${API_URL}/api/posts/${postId}`, {
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-        }
-      );
-    } catch (err) {
-      console.error("Error liking post:", err);
-    }
-  };
+        });
+        setPosts((prev) => prev.filter((post) => post._id !== postId));
+      } catch (err) {
+        console.error("Error deleting post:", err);
+      }
+    },
+    [token]
+  );
 
-  const handleDelete = async (postId) => {
-    try {
-      await axios.delete(`${API_URL}/api/posts/${postId}`, {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      setPosts(posts.filter((post) => post._id !== postId));
-    } catch (err) {
-      console.error("Error deleting post:", err);
-    }
-  };
-
-  const filteredPosts = selectedTag
-    ? posts.filter((post) => post.tags.includes(selectedTag))
-    : posts;
-
-  const toggleFilter = () => {
-    setIsFilterOpen(!isFilterOpen);
-  };
+  const toggleFilter = () => setIsFilterOpen((v) => !v);
 
   return (
     <div className="container-custom py-8">
@@ -97,7 +111,6 @@ const Home = () => {
             Filter by tags to find content that interests you.
           </p>
         </div>
-
         <button
           onClick={toggleFilter}
           className="mt-4 md:mt-0 flex items-center btn-secondary"
@@ -113,7 +126,7 @@ const Home = () => {
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setSelectedTag(null)}
-              className={`px-3 py-1.5 rounded-full text-sm font-medium transition ${
+              className={`${tagButtonBase} ${
                 selectedTag === null
                   ? "bg-primary-600 text-white"
                   : "bg-gray-200 text-gray-700 hover:bg-gray-300"
@@ -121,11 +134,11 @@ const Home = () => {
             >
               All
             </button>
-            {allTags.map((tag, index) => (
+            {allTags.map((tag) => (
               <button
-                key={index}
+                key={tag}
                 onClick={() => setSelectedTag(tag)}
-                className={`px-3 py-1.5 rounded-full text-sm font-medium transition ${
+                className={`${tagButtonBase} ${
                   selectedTag === tag
                     ? "bg-primary-600 text-white"
                     : "bg-gray-200 text-gray-700 hover:bg-gray-300"

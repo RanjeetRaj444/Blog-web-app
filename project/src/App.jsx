@@ -1,10 +1,11 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useState } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import Navbar from "./components/layout/Navbar";
 import LoadingSpinner from "./components/ui/LoadingSpinner";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import { AuthProvider } from "./context/AuthContext";
+import ChatBot from "./components/ChatBot";
 
 const Home = lazy(() => import("./pages/Home"));
 const Login = lazy(() => import("./pages/Login"));
@@ -16,6 +17,7 @@ const Profile = lazy(() => import("./pages/Profile"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 function App() {
+  const [isChatOpen, setIsChatOpen] = useState(false);
   return (
     <AuthProvider>
       <Router>
@@ -70,6 +72,24 @@ function App() {
               </p>
             </div>
           </footer>
+
+          {/* Chat Modal */}
+          <ChatBot isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
+
+          {/* Chat with Bot Button */}
+          {!isChatOpen && (
+            <button
+              onClick={() => setIsChatOpen(true)}
+              style={{
+                position: "fixed",
+                bottom: "20px",
+                right: "20px",
+              }}
+              className="btn-primary flex items-center"
+            >
+              Chat with Bot
+            </button>
+          )}
         </div>
         <Toaster position="top-right" />
       </Router>

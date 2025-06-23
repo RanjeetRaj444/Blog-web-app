@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext } from "react";
+import { useState, useEffect, useContext, useMemo } from "react";
 import { User, Settings } from "lucide-react";
 import axios from "axios";
 import { toast } from "react-hot-toast";
@@ -7,7 +7,12 @@ import { AuthContext } from "../context/AuthContext";
 import PostCard from "../components/posts/PostCard";
 import LoadingSpinner from "../components/ui/LoadingSpinner";
 import Button from "../components/ui/Button";
-// import { l } from "vite/dist/node/types.d-aGj9QkWt";
+
+const cardClass = "bg-white rounded-lg shadow-card p-6 animate-fade-in";
+const labelClass = "block text-sm font-medium text-gray-700 mb-1";
+const inputClass = "input";
+const statLabelClass = "text-gray-600";
+const statValueClass = "font-medium";
 
 const Profile = () => {
   const { user } = useContext(AuthContext);
@@ -19,37 +24,32 @@ const Profile = () => {
   const [bio, setBio] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const token = localStorage.getItem("token");
-  const UserId = localStorage.getItem("UserId");
-  // console.log(UserId);
 
   useEffect(() => {
-    const fetchUserPosts = async () => {
-      if (!user?._id) return;
+    if (!user?._id) return;
 
+    setIsLoading(true);
+    setError(null);
+
+    const fetchData = async () => {
       try {
-        setIsLoading(true);
-        const response = await axios.get(
-          `${API_URL}/api/users/${user._id}/posts`,
-          {
+        const [postsRes, profileRes] = await Promise.all([
+          axios.get(`${API_URL}/api/users/${user._id}/posts`, {
             headers: {
               "Content-Type": "application/json",
               Authorization: `Bearer ${token}`,
             },
-          }
-        );
-        setPosts(response.data);
-
-        const profileResponse = await axios.get(
-          `${API_URL}/api/users/${user._id}`,
-          {
+          }),
+          axios.get(`${API_URL}/api/users/${user._id}`, {
             headers: {
               "Content-Type": "application/json",
               Authorization: `Bearer ${token}`,
             },
-          }
-        );
-        setName(profileResponse.data.name);
-        setBio(profileResponse.data.bio || "");
+          }),
+        ]);
+        setPosts(postsRes.data);
+        setName(profileRes.data.name);
+        setBio(profileRes.data.bio || "");
       } catch (err) {
         setError("Failed to load profile data. Please try again later.");
         console.error(err);
@@ -58,8 +58,8 @@ const Profile = () => {
       }
     };
 
-    fetchUserPosts();
-  }, [user?._id]);
+    fetchData();
+  }, [user, token]);
 
   const handleDeletePost = async (postId) => {
     try {
@@ -69,7 +69,7 @@ const Profile = () => {
           Authorization: `Bearer ${token}`,
         },
       });
-      setPosts(posts.filter((post) => post._id !== postId));
+      setPosts((prev) => prev.filter((post) => post._id !== postId));
       toast.success("Post deleted successfully!");
     } catch (err) {
       toast.error("Failed to delete post. Please try again.");
@@ -79,7 +79,6 @@ const Profile = () => {
 
   const handleProfileUpdate = async (e) => {
     e.preventDefault();
-
     try {
       setIsSubmitting(true);
       await axios.put(
@@ -102,6 +101,17 @@ const Profile = () => {
     }
   };
 
+  // Memoized stats
+  const stats = useMemo(() => {
+    let likes = 0,
+      comments = 0;
+    posts.forEach((post) => {
+      likes += post.likes?.length || 0;
+      comments += post.comments?.length || 0;
+    });
+    return { likes, comments, postsCount: posts.length };
+  }, [posts]);
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -122,53 +132,45 @@ const Profile = () => {
     <div className="container-custom py-8">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
         <div className="md:col-span-1">
-          <div className="bg-white rounded-lg shadow-card p-6 animate-fade-in">
+          <div className={cardClass}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold text-gray-900">Profile</h2>
               <button
-                onClick={() => setIsEditMode(!isEditMode)}
+                onClick={() => setIsEditMode((v) => !v)}
                 className="p-1.5 text-gray-500 hover:text-primary-600 hover:bg-gray-100 rounded-full transition-colors"
+                aria-label="Edit Profile"
               >
                 <Settings size={18} />
               </button>
             </div>
-
             {isEditMode ? (
               <form onSubmit={handleProfileUpdate} className="space-y-4">
                 <div>
-                  <label
-                    htmlFor="name"
-                    className="block text-sm font-medium text-gray-700 mb-1"
-                  >
+                  <label htmlFor="name" className={labelClass}>
                     Name
                   </label>
                   <input
                     id="name"
                     type="text"
-                    className="input"
+                    className={inputClass}
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     required
                   />
                 </div>
-
                 <div>
-                  <label
-                    htmlFor="bio"
-                    className="block text-sm font-medium text-gray-700 mb-1"
-                  >
+                  <label htmlFor="bio" className={labelClass}>
                     Bio
                   </label>
                   <textarea
                     id="bio"
                     rows={4}
-                    className="input"
+                    className={inputClass}
                     placeholder="Tell us about yourself"
                     value={bio}
                     onChange={(e) => setBio(e.target.value)}
                   />
                 </div>
-
                 <div className="flex justify-end space-x-2">
                   <Button
                     type="button"
@@ -206,41 +208,28 @@ const Profile = () => {
               </div>
             )}
           </div>
-
-          <div className="bg-white rounded-lg shadow-card p-6 mt-6 animate-fade-in">
+          <div className={`${cardClass} mt-6`}>
             <h3 className="text-lg font-semibold mb-3">Stats</h3>
             <div className="space-y-3">
               <div className="flex justify-between">
-                <span className="text-gray-600">Posts</span>
-                <span className="font-medium">{posts.length}</span>
+                <span className={statLabelClass}>Posts</span>
+                <span className={statValueClass}>{stats.postsCount}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Likes received</span>
-                <span className="font-medium">
-                  {posts.reduce(
-                    (sum, post) => sum + (post.likes?.length || 0),
-                    0
-                  )}
-                </span>
+                <span className={statLabelClass}>Likes received</span>
+                <span className={statValueClass}>{stats.likes}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Comments received</span>
-                <span className="font-medium">
-                  {posts.reduce(
-                    (sum, post) => sum + (post.comments?.length || 0),
-                    0
-                  )}
-                </span>
+                <span className={statLabelClass}>Comments received</span>
+                <span className={statValueClass}>{stats.comments}</span>
               </div>
             </div>
           </div>
         </div>
-
         <div className="md:col-span-3">
           <div className="mb-6">
             <h2 className="text-2xl font-bold text-gray-900">Your Posts</h2>
           </div>
-
           {posts.length > 0 ? (
             <div className="space-y-6 animate-fade-in">
               {posts.map((post) => (
@@ -249,7 +238,7 @@ const Profile = () => {
                   post={post}
                   isOwner={true}
                   onDelete={handleDeletePost}
-                  UserId={UserId}
+                  UserId={user?._id}
                 />
               ))}
             </div>
