@@ -1,17 +1,49 @@
-import { use, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useContext, useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { Heart, MessageCircle, Edit, Trash2 } from "lucide-react";
+import { toast } from "react-hot-toast";
+import { AuthContext } from "../../context/AuthContext";
 
-const PostCard = ({ post, isOwner = false, onDelete, onLike, UserId }) => {
-  const [isLiked, setIsLiked] = useState(post.isLikedByCurrentUser || false);
+const likedByUser = (post, userId) =>
+  Boolean(post.isLikedByCurrentUser) ||
+  (userId && (post.likes || []).some((id) => String(id) === String(userId)));
+
+const PostCard = ({ post, isOwner = false, onDelete, onLike }) => {
+  const { user } = useContext(AuthContext);
+  const navigate = useNavigate();
+  const [isLiked, setIsLiked] = useState(() => likedByUser(post, user?._id));
   const [likesCount, setLikesCount] = useState(post.likes?.length || 0);
+  const [isLiking, setIsLiking] = useState(false);
 
-  const handleLike = () => {
-    if (onLike) {
-      onLike(post._id);
-      setIsLiked(!isLiked);
-      setLikesCount((prev) => (isLiked ? prev - 1 : prev + 1));
+  // Re-sync when the post data or the logged-in user changes (e.g. after login).
+  useEffect(() => {
+    setIsLiked(likedByUser(post, user?._id));
+    setLikesCount(post.likes?.length || 0);
+  }, [post, user?._id]);
+
+  const canManage = isOwner || (user && post.author?._id === user._id);
+
+  const handleLike = async () => {
+    if (!user) {
+      toast.error("Please log in to like posts.");
+      navigate("/login");
+      return;
+    }
+    if (!onLike || isLiking) return;
+
+    const wasLiked = isLiked;
+    setIsLiking(true);
+    setIsLiked(!wasLiked);
+    setLikesCount((prev) => prev + (wasLiked ? -1 : 1));
+    try {
+      await onLike(post._id);
+    } catch {
+      setIsLiked(wasLiked);
+      setLikesCount((prev) => prev + (wasLiked ? 1 : -1));
+      toast.error("Failed to update like. Please try again.");
+    } finally {
+      setIsLiking(false);
     }
   };
 
@@ -23,16 +55,6 @@ const PostCard = ({ post, isOwner = false, onDelete, onLike, UserId }) => {
       onDelete(post._id);
     }
   };
-  useEffect(() => {
-    for (let i = 0; i < post.likes.length; i++) {
-      if (post.likes[i] === UserId) {
-        setIsLiked(true);
-        break;
-      } else {
-        setIsLiked(false);
-      }
-    }
-  }, []);
 
   return (
     <article className="card hover:translate-y-[-2px] transition-transform duration-300 animate-fade-in">
@@ -45,21 +67,34 @@ const PostCard = ({ post, isOwner = false, onDelete, onLike, UserId }) => {
               </h3>
             </Link>
             <p className="text-sm text-gray-500 mt-1">
-              By {post.author.name} •{" "}
+              By{" "}
+              {post.author?._id ? (
+                <Link
+                  to={`/u/${post.author._id}`}
+                  className="hover:text-primary-600 underline-offset-2 hover:underline"
+                >
+                  {post.author.name}
+                </Link>
+              ) : (
+                "Unknown"
+              )}{" "}
+              •{" "}
               {format(new Date(post.createdAt), "MMM d, yyyy")}
             </p>
           </div>
 
-          {isOwner && (
+          {canManage && (
             <div className="flex space-x-2">
               <Link
                 to={`/edit/${post._id}`}
+                aria-label="Edit post"
                 className="p-1.5 text-gray-500 hover:text-primary-600 hover:bg-gray-100 rounded-full transition-colors"
               >
                 <Edit size={18} />
               </Link>
               <button
                 onClick={handleDelete}
+                aria-label="Delete post"
                 className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-gray-100 rounded-full transition-colors"
               >
                 <Trash2 size={18} />
@@ -77,8 +112,8 @@ const PostCard = ({ post, isOwner = false, onDelete, onLike, UserId }) => {
         </div>
 
         <div className="flex flex-wrap gap-1.5 mb-4">
-          {post.tags.map((tag, index) => (
-            <span key={index} className="tag">
+          {(post.tags || []).map((tag) => (
+            <span key={tag} className="tag">
               {tag}
             </span>
           ))}
@@ -88,6 +123,8 @@ const PostCard = ({ post, isOwner = false, onDelete, onLike, UserId }) => {
           <div className="flex items-center space-x-6">
             <button
               onClick={handleLike}
+              aria-label={isLiked ? "Unlike post" : "Like post"}
+              aria-pressed={isLiked}
               className={`flex items-center space-x-1 ${
                 isLiked ? "text-red-500" : "text-gray-500 hover:text-red-500"
               } transition-colors`}

@@ -1,0 +1,26 @@
+name: Nightly MongoDB backup
+
+# Requires the repository secret MONGODB_URI. Backups are kept as workflow
+# artifacts for 14 days. Restore: mongorestore --uri "$MONGODB_URI" --gzip --archive=backup.gz
+on:
+  schedule:
+    - cron: "30 21 * * *"
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install MongoDB database tools
+        run: |
+          wget -q https://fastdl.mongodb.org/tools/db/mongodb-database-tools-ubuntu2204-x86_64-100.10.0.deb
+          sudo apt-get install -y ./mongodb-database-tools-*.deb
+      - name: Dump database
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        run: mongodump --uri "$MONGODB_URI" --gzip --archive=backup.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mongodb-backup
+          path: backup.gz
+          retention-days: 14

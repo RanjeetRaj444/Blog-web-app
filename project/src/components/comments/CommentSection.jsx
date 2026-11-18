@@ -1,4 +1,5 @@
-import { useState, useContext } from "react";
+import { useState, useContext, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { AuthContext } from "../../context/AuthContext";
 import CommentForm from "./CommentForm";
 import CommentItem from "./CommentItem";
@@ -9,26 +10,25 @@ const CommentSection = ({
   comments,
   onAddComment,
   onDeleteComment,
+  onEditComment,
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [localComments, setLocalComments] = useState(comments);
   const [showForm, setShowForm] = useState(false);
   const { isAuthenticated } = useContext(AuthContext);
 
+  useEffect(() => {
+    setLocalComments(comments);
+  }, [comments]);
+
+  // The handlers return the server's updated comment list and throw on failure,
+  // so the UI only changes when the server accepted the change.
   const handleSubmit = async (content) => {
     try {
       setIsSubmitting(true);
-      await onAddComment(postId, content);
-      const newComment = {
-        _id: `temp-${Date.now()}`,
-        content,
-        author: { _id: "current-user", name: "You" },
-        createdAt: new Date().toISOString(),
-      };
-      setLocalComments([newComment, ...localComments]);
+      const updated = await onAddComment(postId, content);
+      setLocalComments(updated);
       setShowForm(false);
-    } catch (error) {
-      console.error("Error adding comment:", error);
     } finally {
       setIsSubmitting(false);
     }
@@ -36,13 +36,16 @@ const CommentSection = ({
 
   const handleDelete = async (commentId) => {
     try {
-      await onDeleteComment(postId, commentId);
-      setLocalComments(
-        localComments.filter((comment) => comment._id !== commentId)
-      );
+      const updated = await onDeleteComment(postId, commentId);
+      setLocalComments(updated);
     } catch (error) {
       console.error("Error deleting comment:", error);
     }
+  };
+
+  const handleEdit = async (commentId, content) => {
+    const updated = await onEditComment(postId, commentId, content);
+    setLocalComments(updated);
   };
 
   return (
@@ -70,9 +73,9 @@ const CommentSection = ({
       ) : (
         <p className="text-gray-600 mb-6">
           Please{" "}
-          <a href="/login" className="text-primary-600 hover:text-primary-700">
+          <Link to="/login" className="text-primary-600 hover:text-primary-700">
             log in
-          </a>{" "}
+          </Link>{" "}
           to leave a comment.
         </p>
       )}
@@ -84,6 +87,7 @@ const CommentSection = ({
               key={comment._id}
               comment={comment}
               onDelete={() => handleDelete(comment._id)}
+              onEdit={onEditComment ? handleEdit : undefined}
             />
           ))
         ) : (

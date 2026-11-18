@@ -1,116 +1,133 @@
 import { useState, useEffect, useContext } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { Heart, Edit, ArrowLeft } from "lucide-react";
 import axios from "axios";
 import { toast } from "react-hot-toast";
-import { API_URL } from "../utils/constants";
+import { API_URL, getErrorMessage } from "../utils/constants";
 import { AuthContext } from "../context/AuthContext";
 import CommentSection from "../components/comments/CommentSection";
 import LoadingSpinner from "../components/ui/LoadingSpinner";
 import Button from "../components/ui/Button";
+import Markdown from "../components/ui/Markdown";
+import usePageTitle from "../hooks/usePageTitle";
 
 const BlogPost = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [post, setPost] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isLiked, setIsLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
-  const { user } = useContext(AuthContext);
-  const token = localStorage.getItem("token");
-  const UserId = localStorage.getItem("UserId");
-  // console.log(UserId);
+  const [isLiking, setIsLiking] = useState(false);
+  const { user, token } = useContext(AuthContext);
+  usePageTitle(post?.title);
+
   useEffect(() => {
+    let ignore = false;
     const fetchPost = async () => {
       try {
         setIsLoading(true);
+        setError(null);
         const response = await axios.get(`${API_URL}/api/posts/${id}`, {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
-        setPost(response.data);
-        setIsLiked(response.data.isLikedByCurrentUser || false);
-        setLikesCount(response.data.likes?.length || 0);
+        if (ignore) return;
+        const data = response.data;
+        setPost(data);
+        setIsLiked(
+          Boolean(data.isLikedByCurrentUser) ||
+            Boolean(
+              user && (data.likes || []).some((l) => String(l) === user._id)
+            )
+        );
+        setLikesCount(data.likes?.length || 0);
       } catch (err) {
-        setError("Failed to load post. Please try again later.");
+        if (ignore) return;
+        setPost(null);
+        setError(
+          err.response?.status === 404
+            ? "Post not found"
+            : "Failed to load post. Please try again later."
+        );
         console.error(err);
       } finally {
-        setIsLoading(false);
+        if (!ignore) setIsLoading(false);
       }
     };
 
-    if (id) {
-      fetchPost();
-    }
-    if (post?.likes && UserId) {
-      const isLikedByUser = post.likes.includes(UserId);
-      setIsLiked(isLikedByUser);
-    }
-  }, [id]);
-  useEffect(() => {
-    if (post?.likes && UserId) {
-      const isLikedByUser = post.likes.some(
-        (id) => String(id) === String(UserId)
-      );
-      setIsLiked(isLikedByUser);
-    }
-  }, [post, UserId]);
+    fetchPost();
+    return () => {
+      ignore = true;
+    };
+  }, [id, token, user]);
+
+  const authHeaders = { Authorization: `Bearer ${token}` };
 
   const handleLike = async () => {
+    if (!user) {
+      toast.error("Please log in to like posts.");
+      navigate("/login");
+      return;
+    }
+    if (isLiking) return;
+    setIsLiking(true);
     try {
-      await axios.post(
+      const response = await axios.post(
         `${API_URL}/api/posts/${id}/like`,
         {},
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        }
+        { headers: authHeaders }
       );
-      setIsLiked(!isLiked);
-      setLikesCount((prev) => (isLiked ? prev - 1 : prev + 1));
+      setLikesCount(response.data.length);
+      setIsLiked(response.data.some((l) => String(l) === user._id));
     } catch (err) {
-      toast.error("Failed to like post. Please try again.");
+      toast.error(getErrorMessage(err, "Failed to like post."));
       console.error(err);
+    } finally {
+      setIsLiking(false);
     }
   };
 
+  // Both handlers return the updated comment list from the server and throw on failure.
   const handleAddComment = async (postId, content) => {
     try {
-      await axios.post(
+      const response = await axios.post(
         `${API_URL}/api/posts/${postId}/comments`,
         { content },
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        }
+        { headers: authHeaders }
       );
+      return response.data;
     } catch (err) {
-      toast.error("Failed to add comment. Please try again.");
-      console.error(err);
+      toast.error(getErrorMessage(err, "Failed to add comment."));
+      throw err;
+    }
+  };
+
+  const handleEditComment = async (postId, commentId, content) => {
+    try {
+      const response = await axios.put(
+        `${API_URL}/api/posts/${postId}/comments/${commentId}`,
+        { content },
+        { headers: authHeaders }
+      );
+      return response.data;
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to edit comment."));
+      throw err;
     }
   };
 
   const handleDeleteComment = async (postId, commentId) => {
     try {
-      await axios.delete(
+      const response = await axios.delete(
         `${API_URL}/api/posts/${postId}/comments/${commentId}`,
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        }
+        { headers: authHeaders }
       );
+      return response.data;
     } catch (err) {
-      toast.error("Failed to delete comment. Please try again.");
-      console.error(err);
+      toast.error(getErrorMessage(err, "Failed to delete comment."));
+      throw err;
     }
   };
 
@@ -133,7 +150,9 @@ const BlogPost = () => {
     );
   }
 
-  const isOwner = user && post.author._id === user._id;
+  const authorName = post.author?.name || "Unknown";
+  const isOwner = user && post.author?._id === user._id;
+
   return (
     <div className="container-custom py-8 animate-fade-in">
       <div className="max-w-3xl mx-auto">
@@ -157,12 +176,21 @@ const BlogPost = () => {
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
                   <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-800 font-semibold">
-                    {post.author.name.charAt(0).toUpperCase()}
+                    {authorName.charAt(0).toUpperCase()}
                   </div>
                   <div className="ml-3">
-                    <span className="font-medium text-gray-900">
-                      {post.author.name}
-                    </span>
+                    {post.author?._id ? (
+                      <Link
+                        to={`/u/${post.author._id}`}
+                        className="font-medium text-gray-900 hover:text-primary-600"
+                      >
+                        {authorName}
+                      </Link>
+                    ) : (
+                      <span className="font-medium text-gray-900">
+                        {authorName}
+                      </span>
+                    )}
                     <p className="text-sm text-gray-500">
                       {format(new Date(post.createdAt), "MMMM d, yyyy")}
                     </p>
@@ -181,17 +209,13 @@ const BlogPost = () => {
               </div>
             </header>
 
-            <div className="prose max-w-none mb-8">
-              {post.content.split("\n").map((paragraph, index) => (
-                <p key={index} className="text-gray-700 mb-4 leading-relaxed">
-                  {paragraph}
-                </p>
-              ))}
+            <div className="mb-8">
+              <Markdown>{post.content}</Markdown>
             </div>
 
             <div className="flex flex-wrap gap-2 mb-6">
-              {post.tags.map((tag, index) => (
-                <span key={index} className="tag">
+              {(post.tags || []).map((tag) => (
+                <span key={tag} className="tag">
                   {tag}
                 </span>
               ))}
@@ -201,6 +225,7 @@ const BlogPost = () => {
               <Button
                 onClick={handleLike}
                 variant="ghost"
+                disabled={isLiking}
                 className={`flex items-center ${
                   isLiked ? "text-red-500" : "text-gray-700"
                 }`}
@@ -220,6 +245,7 @@ const BlogPost = () => {
               comments={post.comments || []}
               onAddComment={handleAddComment}
               onDeleteComment={handleDeleteComment}
+              onEditComment={handleEditComment}
             />
           </div>
         </article>

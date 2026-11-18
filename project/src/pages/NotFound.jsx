@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom';
 import { Home } from 'lucide-react';
+import usePageTitle from '../hooks/usePageTitle';
 
 const NotFound = () => {
+  usePageTitle('Page not found');
   return (
     <div className="container-custom py-20">
       <div className="max-w-md mx-auto text-center">

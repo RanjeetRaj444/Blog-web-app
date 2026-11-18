@@ -5,6 +5,7 @@ import { toast } from 'react-hot-toast';
 import { Eye, EyeOff } from 'lucide-react';
 import { AuthContext } from '../context/AuthContext';
 import Button from '../components/ui/Button';
+import usePageTitle from '../hooks/usePageTitle';
 
 
 const Register = () => {
@@ -12,6 +13,7 @@ const Register = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { register: registerUser } = useContext(AuthContext);
   const navigate = useNavigate();
+  usePageTitle('Register');
   
   const { 
     register, 
@@ -99,7 +101,7 @@ const Register = () => {
                   placeholder="••••••••"
                   {...register('password', { 
                     required: 'Password is required',
-                    minLength: { value: 6, message: 'Password must be at least 6 characters' }
+                    minLength: { value: 8, message: 'Password must be at least 8 characters' }
                   })}
                 />
                 <button

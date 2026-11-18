@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { X } from 'lucide-react';
 import Button from '../ui/Button';
+import Markdown from '../ui/Markdown';
 
 
 
@@ -9,8 +10,9 @@ import Button from '../ui/Button';
 const PostForm = ({ initialData, onSubmit, isSubmitting }) => {
   const [tags, setTags] = useState(initialData?.tags || []);
   const [tagInput, setTagInput] = useState('');
+  const [showPreview, setShowPreview] = useState(false);
   
-  const { register, handleSubmit, formState: { errors } } = useForm({
+  const { register, handleSubmit, watch, formState: { errors } } = useForm({
     defaultValues: {
       title: initialData?.title || '',
       content: initialData?.content || '',
@@ -19,10 +21,11 @@ const PostForm = ({ initialData, onSubmit, isSubmitting }) => {
   });
 
   const handleAddTag = () => {
-    if (tagInput.trim() !== '' && !tags.includes(tagInput.trim())) {
-      setTags([...tags, tagInput.trim()]);
-      setTagInput('');
+    const tag = tagInput.trim();
+    if (tag !== '' && !tags.includes(tag) && tags.length < 10) {
+      setTags([...tags, tag]);
     }
+    setTagInput('');
   };
 
   const handleKeyDown = (e) => {
@@ -63,12 +66,48 @@ const PostForm = ({ initialData, onSubmit, isSubmitting }) => {
       </div>
       
       <div>
-        <label htmlFor="content" className="block text-sm font-medium text-gray-700 mb-1">
-          Content
-        </label>
+        <div className="flex items-center justify-between mb-1">
+          <label htmlFor="content" className="block text-sm font-medium text-gray-700">
+            Content
+          </label>
+          <div className="flex gap-1 text-sm" role="tablist" aria-label="Editor mode">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={!showPreview}
+              onClick={() => setShowPreview(false)}
+              className={`px-3 py-1 rounded ${!showPreview ? 'bg-primary-100 text-primary-800' : 'text-gray-600'}`}
+            >
+              Write
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={showPreview}
+              onClick={() => setShowPreview(true)}
+              className={`px-3 py-1 rounded ${showPreview ? 'bg-primary-100 text-primary-800' : 'text-gray-600'}`}
+            >
+              Preview
+            </button>
+          </div>
+        </div>
+        {showPreview && (
+          <div
+            data-testid="markdown-preview"
+            className="input min-h-[12rem] bg-gray-50"
+          >
+            {watch('content')?.trim() ? (
+              <Markdown>{watch('content')}</Markdown>
+            ) : (
+              <p className="text-gray-500 italic">Nothing to preview yet.</p>
+            )}
+          </div>
+        )}
+        <p className="text-xs text-gray-500 mb-1">Markdown supported.</p>
         <textarea
           id="content"
           rows={8}
+          hidden={showPreview}
           className={`input ${errors.content ? 'border-red-500 focus:ring-red-500' : ''}`}
           placeholder="Write your post content here..."
           {...register('content', { required: 'Content is required' })}
@@ -86,6 +125,7 @@ const PostForm = ({ initialData, onSubmit, isSubmitting }) => {
           <input
             id="tags"
             type="text"
+            maxLength={30}
             className="input"
             placeholder="Add a tag and press Enter"
             value={tagInput}
@@ -109,6 +149,7 @@ const PostForm = ({ initialData, onSubmit, isSubmitting }) => {
               <button
                 type="button"
                 onClick={() => handleRemoveTag(tag)}
+                aria-label={`Remove tag ${tag}`}
                 className="ml-1 p-0.5 text-primary-700 hover:text-primary-900 rounded-full"
               >
                 <X size={14} />

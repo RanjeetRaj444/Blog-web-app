@@ -10,6 +10,10 @@ const CommentSchema = new mongoose.Schema({
     ref: "User",
     required: true,
   },
+  edited: {
+    type: Boolean,
+    default: false,
+  },
   createdAt: {
     type: Date,
     default: Date.now,
@@ -56,6 +60,10 @@ PostSchema.pre("save", function (next) {
   this.updatedAt = Date.now();
   next();
 });
+
+PostSchema.index({ createdAt: -1 });
+PostSchema.index({ tags: 1 });
+PostSchema.index({ author: 1, createdAt: -1 });
 
 const Post = mongoose.model("Post", PostSchema);
 

@@ -1,5 +1,6 @@
 import { createContext, useState, useEffect } from "react";
 import axios from "axios";
+import { toast } from "react-hot-toast";
 import { API_URL } from "../utils/constants";
 
 export const AuthContext = createContext({
@@ -17,70 +18,81 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem("token"));
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const loadUser = async () => {
-      if (token) {
-        try {
-          const config = {
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-          };
-
-          const response = await axios.get(`${API_URL}/api/auth/user`, config);
-          setUser(response.data);
-        } catch (error) {
-          console.error("Error loading user:", error);
-          localStorage.removeItem("token");
-          setToken(null);
-          setUser(null);
-        }
-      }
-      setIsLoading(false);
-    };
-
-    loadUser();
-  }, [token]);
-
-
-  const login = async (email, password) => {
-    try {
-      const response = await axios.post(`${API_URL}/api/auth/login`, {
-        email,
-        password,
-      });
-      localStorage.setItem("token", response.data.token);
-      localStorage.setItem("UserId", response.data.user._id);
-      setToken(response.data.token);
-      setUser(response.data.user);
-    } catch (error) {
-      console.log(error);
-    }
-  };
-
-
-  const register = async (name, email, password) => {
-    try {
-      const response = await axios.post(`${API_URL}/api/auth/register`, {
-        name,
-        email,
-        password,
-      });
-      localStorage.setItem("token", response.data.token);
-      setToken(response.data.token);
-      setUser(response.data.user);
-    } catch (error) {
-      console.log(error);
-    }
-  };
-
-  const logout = () => {
+  const clearSession = () => {
     localStorage.removeItem("token");
-    localStorage.removeItem("UserId");
     setToken(null);
     setUser(null);
   };
+
+  useEffect(() => {
+    let ignore = false;
+    const loadUser = async () => {
+      if (token) {
+        try {
+          const response = await axios.get(`${API_URL}/api/auth/user`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (ignore) return;
+          setUser(response.data);
+        } catch (error) {
+          console.error("Error loading user:", error);
+          // Only drop the session when the token is actually rejected, not on
+          // network errors or server cold starts.
+          const status = error.response?.status;
+          if (!ignore && (status === 401 || status === 403)) clearSession();
+        }
+      }
+      if (!ignore) setIsLoading(false);
+    };
+
+    loadUser();
+    return () => {
+      ignore = true;
+    };
+  }, [token]);
+
+  // Any authenticated request rejected with 401 means the token expired/was revoked.
+  useEffect(() => {
+    if (!token || !axios.interceptors?.response) return undefined;
+    const id = axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        const sentAuth = error.config?.headers?.Authorization;
+        if (error.response?.status === 401 && sentAuth) {
+          toast.error("Session expired. Please log in again.");
+          clearSession();
+        }
+        return Promise.reject(error);
+      }
+    );
+    return () => axios.interceptors.response.eject(id);
+  }, [token]);
+
+  const saveSession = (data) => {
+    localStorage.setItem("token", data.token);
+    setToken(data.token);
+    setUser(data.user);
+  };
+
+  // login/register throw on failure so callers can show the server's message.
+  const login = async (email, password) => {
+    const response = await axios.post(`${API_URL}/api/auth/login`, {
+      email,
+      password,
+    });
+    saveSession(response.data);
+  };
+
+  const register = async (name, email, password) => {
+    const response = await axios.post(`${API_URL}/api/auth/register`, {
+      name,
+      email,
+      password,
+    });
+    saveSession(response.data);
+  };
+
+  const logout = clearSession;
 
   return (
     <AuthContext.Provider

@@ -16,7 +16,6 @@ const Navbar = () => {
     logout();
     navigate('/');
     setIsMenuOpen(false);
-    window.location.reload();
   };
 
   const closeMenu = () => {

@@ -5,12 +5,15 @@ import { toast } from 'react-hot-toast';
 import { Eye, EyeOff } from 'lucide-react';
 import { AuthContext } from '../context/AuthContext';
 import Button from '../components/ui/Button';
+import usePageTitle from '../hooks/usePageTitle';
+import { getErrorMessage } from '../utils/constants';
 
 const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { login } = useContext(AuthContext);
   const navigate = useNavigate();
+  usePageTitle('Log in');
   
   const { register, handleSubmit, formState: { errors } } = useForm();
   
@@ -22,7 +25,7 @@ const Login = () => {
       navigate('/');
     } catch (error) {
       console.error(error);
-      toast.error('Invalid email or password');
+      toast.error(getErrorMessage(error, 'Login failed. Please try again.'));
     } finally {
       setIsSubmitting(false);
     }

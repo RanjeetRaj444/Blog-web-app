@@ -2,8 +2,10 @@ import { useState, useEffect, useContext, useMemo } from "react";
 import { User, Settings } from "lucide-react";
 import axios from "axios";
 import { toast } from "react-hot-toast";
-import { API_URL } from "../utils/constants";
+import { Link } from "react-router-dom";
+import { API_URL, getErrorMessage } from "../utils/constants";
 import { AuthContext } from "../context/AuthContext";
+import usePageTitle from "../hooks/usePageTitle";
 import PostCard from "../components/posts/PostCard";
 import LoadingSpinner from "../components/ui/LoadingSpinner";
 import Button from "../components/ui/Button";
@@ -15,7 +17,8 @@ const statLabelClass = "text-gray-600";
 const statValueClass = "font-medium";
 
 const Profile = () => {
-  const { user } = useContext(AuthContext);
+  const { user, token } = useContext(AuthContext);
+  usePageTitle("Profile");
   const [posts, setPosts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -23,7 +26,6 @@ const Profile = () => {
   const [name, setName] = useState("");
   const [bio, setBio] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const token = localStorage.getItem("token");
 
   useEffect(() => {
     if (!user?._id) return;
@@ -72,9 +74,17 @@ const Profile = () => {
       setPosts((prev) => prev.filter((post) => post._id !== postId));
       toast.success("Post deleted successfully!");
     } catch (err) {
-      toast.error("Failed to delete post. Please try again.");
+      toast.error(getErrorMessage(err, "Failed to delete post. Please try again."));
       console.error(err);
     }
+  };
+
+  const handleLike = async (postId) => {
+    await axios.post(
+      `${API_URL}/api/posts/${postId}/like`,
+      {},
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
   };
 
   const handleProfileUpdate = async (e) => {
@@ -94,7 +104,7 @@ const Profile = () => {
       toast.success("Profile updated successfully!");
       setIsEditMode(false);
     } catch (err) {
-      toast.error("Failed to update profile. Please try again.");
+      toast.error(getErrorMessage(err, "Failed to update profile. Please try again."));
       console.error(err);
     } finally {
       setIsSubmitting(false);
@@ -238,7 +248,7 @@ const Profile = () => {
                   post={post}
                   isOwner={true}
                   onDelete={handleDeletePost}
-                  UserId={user?._id}
+                  onLike={handleLike}
                 />
               ))}
             </div>
@@ -247,9 +257,9 @@ const Profile = () => {
               <p className="text-gray-600 mb-4">
                 You haven't created any posts yet.
               </p>
-              <Button as="a" href="/create" variant="primary">
+              <Link to="/create" className="btn-primary">
                 Create Your First Post
-              </Button>
+              </Link>
             </div>
           )}
         </div>

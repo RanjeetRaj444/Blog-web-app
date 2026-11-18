@@ -1,0 +1,23 @@
+# Render blueprint for the API. Secrets are set in the Render dashboard (sync: false).
+services:
+  - type: web
+    name: blog-web-app-api
+    runtime: node
+    rootDir: server
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /healthz
+    autoDeploy: true # deploys on every push to the connected branch (main)
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CLIENT_ORIGIN
+        value: https://panini8blogplateform.netlify.app
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-20b

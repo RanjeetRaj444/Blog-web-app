@@ -1,114 +1,152 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
-import { Filter } from "lucide-react";
+import { useState, useEffect, useCallback, useContext } from "react";
+import { Filter, Search } from "lucide-react";
 import axios from "axios";
 import { API_URL } from "../utils/constants";
+import { AuthContext } from "../context/AuthContext";
+import usePageTitle from "../hooks/usePageTitle";
 import PostCard from "../components/posts/PostCard";
 import LoadingSpinner from "../components/ui/LoadingSpinner";
 
-const tagButtonBase =
-  "px-3 py-1.5 rounded-full text-sm font-medium transition";
+const tagButtonBase = "px-3 py-1.5 rounded-full text-sm font-medium transition";
+const PAGE_SIZE = 12;
+const SEARCH_DEBOUNCE_MS = 400;
 
 const Home = () => {
   const [posts, setPosts] = useState([]);
+  const [allTags, setAllTags] = useState([]);
+  const [page, setPage] = useState(1);
+  const [pages, setPages] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState(null);
   const [selectedTag, setSelectedTag] = useState(null);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const token = localStorage.getItem("token");
-  const UserId = localStorage.getItem("UserId");
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState("newest");
+  const [retryCount, setRetryCount] = useState(0);
+  const { token } = useContext(AuthContext);
 
+  usePageTitle();
+
+  // Debounce the search box so we don't hit the API on every keystroke.
+  useEffect(() => {
+    const id = setTimeout(() => setSearch(searchInput.trim()), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(id);
+  }, [searchInput]);
+
+  const authHeaders = useCallback(
+    () => (token ? { Authorization: `Bearer ${token}` } : {}),
+    [token]
+  );
+
+  const fetchPage = useCallback(
+    async (pageNumber) => {
+      const response = await axios.get(`${API_URL}/api/posts`, {
+        headers: authHeaders(),
+        params: {
+          page: pageNumber,
+          limit: PAGE_SIZE,
+          sort,
+          ...(selectedTag ? { tag: selectedTag } : {}),
+          ...(search ? { q: search } : {}),
+        },
+      });
+      return response.data;
+    },
+    [authHeaders, selectedTag, search, sort]
+  );
+
+  // First page (re)loads when the filters, search, sort or user change.
   useEffect(() => {
     let ignore = false;
-    const fetchPosts = async () => {
+    const load = async () => {
       try {
         setIsLoading(true);
-        const response = await axios.get(`${API_URL}/api/posts`, {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        if (!ignore) setPosts(response.data);
+        setError(null);
+        const data = await fetchPage(1);
+        if (ignore) return;
+        setPosts(data.posts);
+        setPage(data.page);
+        setPages(data.pages);
       } catch (err) {
         if (!ignore) {
-          setError("Failed to fetch posts. Please try again later.");
+          setError("Failed to fetch posts.");
           console.error(err);
         }
       } finally {
         if (!ignore) setIsLoading(false);
       }
     };
-    fetchPosts();
+    load();
     return () => {
       ignore = true;
     };
-  }, [UserId, token]);
+  }, [fetchPage, retryCount]);
 
-  const allTags = useMemo(() => {
-    const tagSet = new Set();
-    posts.forEach((post) => {
-      post.tags?.forEach((tag) => tagSet.add(tag));
-    });
-    return Array.from(tagSet);
-  }, [posts]);
+  useEffect(() => {
+    axios
+      .get(`${API_URL}/api/posts/tags`)
+      .then((res) => setAllTags(res.data))
+      .catch((err) => console.error("Error loading tags:", err));
+  }, []);
 
-  const filteredPosts = useMemo(
-    () =>
-      selectedTag
-        ? posts.filter((post) => post.tags?.includes(selectedTag))
-        : posts,
-    [posts, selectedTag]
-  );
+  const handleLoadMore = async () => {
+    try {
+      setIsLoadingMore(true);
+      const data = await fetchPage(page + 1);
+      setPosts((prev) => [
+        ...prev,
+        ...data.posts.filter((p) => !prev.some((x) => x._id === p._id)),
+      ]);
+      setPage(data.page);
+      setPages(data.pages);
+    } catch (err) {
+      console.error("Error loading more posts:", err);
+      setError("Failed to load more posts.");
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
 
   const handleLike = useCallback(
     async (postId) => {
-      try {
-        await axios.post(
-          `${API_URL}/api/posts/${postId}/like`,
-          {},
-          {
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-      } catch (err) {
-        console.error("Error liking post:", err);
-      }
+      // PostCard reverts its optimistic update if this throws.
+      await axios.post(
+        `${API_URL}/api/posts/${postId}/like`,
+        {},
+        { headers: authHeaders() }
+      );
     },
-    [token]
+    [authHeaders]
   );
 
   const handleDelete = useCallback(
     async (postId) => {
       try {
         await axios.delete(`${API_URL}/api/posts/${postId}`, {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
+          headers: authHeaders(),
         });
         setPosts((prev) => prev.filter((post) => post._id !== postId));
       } catch (err) {
         console.error("Error deleting post:", err);
       }
     },
-    [token]
+    [authHeaders]
   );
 
   const toggleFilter = () => setIsFilterOpen((v) => !v);
 
   return (
     <div className="container-custom py-8">
-      <div className="flex flex-col md:flex-row justify-between items-start mb-8">
+      <div className="flex flex-col md:flex-row justify-between items-start mb-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
             Panini8 Blog
           </h1>
           <p className="text-gray-600 max-w-2xl">
             Explore the latest thoughts, ideas, and stories from our community.
-            Filter by tags to find content that interests you.
+            Search, sort, or filter by tags to find content that interests you.
           </p>
         </div>
         <button
@@ -118,6 +156,35 @@ const Home = () => {
           <Filter size={18} className="mr-2" />
           Filter by tag
         </button>
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-3 mb-8">
+        <div className="relative flex-1">
+          <Search
+            size={18}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            aria-hidden="true"
+          />
+          <input
+            type="search"
+            aria-label="Search posts"
+            placeholder="Search posts..."
+            className="input pl-10"
+            value={searchInput}
+            maxLength={100}
+            onChange={(e) => setSearchInput(e.target.value)}
+          />
+        </div>
+        <select
+          aria-label="Sort posts"
+          className="input sm:w-48"
+          value={sort}
+          onChange={(e) => setSort(e.target.value)}
+        >
+          <option value="newest">Newest</option>
+          <option value="oldest">Oldest</option>
+          <option value="popular">Most liked</option>
+        </select>
       </div>
 
       {isFilterOpen && (
@@ -155,26 +222,51 @@ const Home = () => {
         <div className="flex justify-center items-center py-20">
           <LoadingSpinner size="large" />
         </div>
-      ) : error ? (
-        <div className="text-center py-20">
-          <p className="text-red-600">{error}</p>
+      ) : error && posts.length === 0 ? (
+        <div className="text-center py-20" role="alert">
+          <p className="text-red-600 mb-2">{error}</p>
+          <p className="text-gray-600 mb-4">
+            The server may be waking up (free hosting sleeps when idle). This
+            can take up to a minute.
+          </p>
+          <button
+            className="btn-primary"
+            onClick={() => setRetryCount((c) => c + 1)}
+          >
+            Retry
+          </button>
         </div>
-      ) : filteredPosts.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
-          {filteredPosts.map((post) => (
-            <PostCard
-              key={post._id}
-              post={post}
-              onLike={handleLike}
-              onDelete={handleDelete}
-              UserId={UserId}
-            />
-          ))}
-        </div>
+      ) : posts.length > 0 ? (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
+            {posts.map((post) => (
+              <PostCard
+                key={post._id}
+                post={post}
+                onLike={handleLike}
+                onDelete={handleDelete}
+              />
+            ))}
+          </div>
+          {error && <p className="text-center text-red-600 mt-6">{error}</p>}
+          {page < pages && (
+            <div className="flex justify-center mt-8">
+              <button
+                onClick={handleLoadMore}
+                disabled={isLoadingMore}
+                className="btn-secondary"
+              >
+                {isLoadingMore ? "Loading..." : "Load more"}
+              </button>
+            </div>
+          )}
+        </>
       ) : (
         <div className="text-center py-20">
           <p className="text-gray-600">
-            {selectedTag
+            {search
+              ? `No posts match "${search}".`
+              : selectedTag
               ? `No posts found with the tag "${selectedTag}".`
               : "No posts found. Check back later!"}
           </p>

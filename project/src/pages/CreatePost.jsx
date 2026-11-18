@@ -1,15 +1,18 @@
-import { useState } from "react";
+import { useState, useContext } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import axios from "axios";
 import { toast } from "react-hot-toast";
-import { API_URL } from "../utils/constants";
+import { API_URL, getErrorMessage } from "../utils/constants";
+import { AuthContext } from "../context/AuthContext";
+import usePageTitle from "../hooks/usePageTitle";
 import PostForm from "../components/posts/PostForm";
 
 const CreatePost = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
-  const token = localStorage.getItem("token");
+  usePageTitle("Create post");
+  const { token } = useContext(AuthContext);
   const handleSubmit = async (data) => {
     try {
       setIsSubmitting(true);
@@ -23,7 +26,7 @@ const CreatePost = () => {
       navigate("/");
     } catch (error) {
       console.error("Error creating post:", error);
-      toast.error("Failed to create post. Please try again.");
+      toast.error(getErrorMessage(error, "Failed to create post. Please try again."));
     } finally {
       setIsSubmitting(false);
     }

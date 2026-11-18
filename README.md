@@ -174,3 +174,38 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - [MongoDB](https://www.mongodb.com/)
 - [Tailwind CSS](https://tailwindcss.com/)
 - [Lucide Icons](https://lucide.dev/)
+
+## Setup & Configuration
+
+**Server** (`server/.env`, see `server/.env.example`):
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `MONGODB_URI` | yes | MongoDB connection string |
+| `JWT_SECRET` | yes | Secret for signing tokens (server refuses to start without it) |
+| `CLIENT_ORIGIN` | recommended | Comma-separated allowed CORS origins |
+| `GROQ_API_KEY` | for chatbot | Groq API key (server-side only; never exposed to the browser) |
+| `GROQ_MODEL` | no | Defaults to `openai/gpt-oss-20b` |
+| `PORT` | no | Defaults to 5000 |
+
+**Client** (`project/.env`, optional): `VITE_BACKEND_URL` (defaults to the hosted API).
+
+```bash
+cd server  && npm install && npm run dev    # API on :5000
+cd project && npm install && npm run dev    # app on :5173
+```
+
+## Tests
+
+```bash
+cd server  && npm test   # API tests against an in-memory MongoDB
+cd project && npm test   # React component tests
+```
+
+## Quality checks
+```bash
+cd server  && npm run test:coverage
+cd project && npm run test:coverage && npm run lint && npm run build
+cd e2e     && npm install && npx playwright install chromium && npm test   # browser E2E
+```
+See `ROADMAP.md` for the improvement plan and `CHANGELOG.md` for release notes.
