@@ -21,7 +21,7 @@ jobs:
           cache-dependency-path: server/package-lock.json
       - run: npm ci
       - name: Cache MongoDB binary used by tests
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: server/node_modules/.cache/mongodb-memory-server
           key: mongodb-memory-server-${{ runner.os }}
