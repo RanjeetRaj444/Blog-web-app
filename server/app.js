@@ -9,6 +9,7 @@ const chatRoutes = require("./routes/chat.js");
 const sanitize = require("./middleware/sanitize.js");
 const logger = require("./utils/logger.js");
 const mongoose = require("mongoose");
+const sitemapRoute = require("./routes/sitemap.js");
 
 const app = express();
 // Render sits behind a proxy; needed for correct client IPs in rate limiting.
@@ -54,6 +55,8 @@ app.get("/healthz", (req, res) => {
   const dbUp = mongoose.connection.readyState === 1;
   res.status(dbUp ? 200 : 503).json({ status: dbUp ? "ok" : "degraded", db: dbUp });
 });
+
+app.get("/sitemap.xml", sitemapRoute);
 
 app.get("/", (req, res) => {
   res.send("Panini8 Blog API is running");

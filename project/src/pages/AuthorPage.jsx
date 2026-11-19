@@ -2,10 +2,9 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { format } from "date-fns";
 import axios from "axios";
-import { API_URL } from "../utils/constants";
 import usePageTitle from "../hooks/usePageTitle";
 import PostCard from "../components/posts/PostCard";
-import LoadingSpinner from "../components/ui/LoadingSpinner";
+import { AuthorSkeleton } from "../components/ui/Skeleton";
 
 const AuthorPage = () => {
   const { id } = useParams();
@@ -13,13 +12,13 @@ const AuthorPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  usePageTitle(data?.user?.name);
+  usePageTitle(data?.user?.name, data?.user?.bio);
 
   const load = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
-      const res = await axios.get(`${API_URL}/api/users/${id}/public`);
+      const res = await axios.get(`/api/users/${id}/public`);
       setData(res.data);
     } catch (err) {
       setData(null);
@@ -38,11 +37,7 @@ const AuthorPage = () => {
   }, [load]);
 
   if (isLoading) {
-    return (
-      <div className="flex justify-center items-center py-20">
-        <LoadingSpinner size="large" />
-      </div>
-    );
+    return <AuthorSkeleton />;
   }
 
   if (error || !data) {

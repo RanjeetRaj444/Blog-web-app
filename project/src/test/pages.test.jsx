@@ -57,7 +57,7 @@ beforeEach(() => {
 });
 
 describe("Home", () => {
-  it("lists posts, sends the token only when logged in", async () => {
+  it("lists posts for logged-in and anonymous visitors", async () => {
     axios.get.mockImplementation(async (url) =>
       url.endsWith("/tags")
         ? { data: ["react"] }
@@ -67,7 +67,8 @@ describe("Home", () => {
     expect(await screen.findByText("Post 1")).toBeInTheDocument();
     expect(screen.getByText("Post 2")).toBeInTheDocument();
     const postsCall = axios.get.mock.calls.find(([u]) => u.endsWith("/api/posts"));
-    expect(postsCall[1].headers.Authorization).toBe("Bearer tok");
+    // auth is added by the shared axios interceptor, not per call
+    expect(postsCall[1].headers).toBeUndefined();
     expect(screen.queryByText("Load more")).not.toBeInTheDocument();
     unmount();
 
@@ -75,7 +76,7 @@ describe("Home", () => {
     renderAt("/", "/", <Home />, anon);
     await screen.findByText("Post 1");
     const anonCall = axios.get.mock.calls.find(([u]) => u.endsWith("/api/posts"));
-    expect(anonCall[1].headers.Authorization).toBeUndefined();
+    expect(anonCall[1].headers).toBeUndefined();
   });
 
   it("loads more pages without duplicating posts", async () => {
@@ -131,18 +132,11 @@ describe("Home", () => {
     renderAt("/", "/", <Home />);
     await screen.findByText("Post 1");
     await userEvent.click(screen.getAllByRole("button", { name: /like post/i })[0]);
-    expect(axios.post).toHaveBeenCalledWith(
-      expect.stringContaining("/api/posts/p1/like"),
-      {},
-      { headers: { Authorization: "Bearer tok" } }
-    );
+    expect(axios.post).toHaveBeenCalledWith("/api/posts/p1/like");
     expect(screen.getAllByLabelText("Delete post")).toHaveLength(1); // only own post
     await userEvent.click(screen.getByLabelText("Delete post"));
     await waitFor(() => expect(screen.queryByText("Post 2")).not.toBeInTheDocument());
-    expect(axios.delete).toHaveBeenCalledWith(
-      expect.stringContaining("/api/posts/p2"),
-      expect.any(Object)
-    );
+    expect(axios.delete).toHaveBeenCalledWith("/api/posts/p2");
   });
 });
 
@@ -214,11 +208,9 @@ describe("BlogPost", () => {
     await userEvent.type(screen.getByPlaceholderText(/share your thoughts/i), "Great read");
     await userEvent.click(screen.getByRole("button", { name: /submit/i }));
     expect(await screen.findByText("Great read")).toBeInTheDocument();
-    expect(axios.post).toHaveBeenCalledWith(
-      expect.stringContaining("/api/posts/p1/comments"),
-      { content: "Great read" },
-      { headers: { Authorization: "Bearer tok" } }
-    );
+    expect(axios.post).toHaveBeenCalledWith("/api/posts/p1/comments", {
+      content: "Great read",
+    });
     await userEvent.click(screen.getByTitle("Delete comment"));
     await waitFor(() => expect(screen.queryByText("Great read")).not.toBeInTheDocument());
   });
@@ -252,10 +244,14 @@ describe("CreatePost", () => {
     await userEvent.type(screen.getByLabelText("Tags"), "node{Enter}");
     await userEvent.click(screen.getByRole("button", { name: /create post/i }));
     await waitFor(() => expect(axios.post).toHaveBeenCalled());
-    const [url, body, opts] = axios.post.mock.calls[0];
-    expect(url).toMatch(/\/api\/posts$/);
-    expect(body).toEqual({ title: "Hello", content: "World", tags: ["js", "node"] });
-    expect(opts.headers.Authorization).toBe("Bearer tok");
+    const [url, body] = axios.post.mock.calls[0];
+    expect(url).toBe("/api/posts");
+    expect(body).toEqual({
+      title: "Hello",
+      content: "World",
+      tags: ["js", "node"],
+      status: "published",
+    });
     expect(toast.success).toHaveBeenCalled();
     expect(await screen.findByTestId("where")).toHaveTextContent("/");
   });
@@ -284,7 +280,12 @@ describe("EditPost", () => {
     await userEvent.type(title, "Renamed");
     await userEvent.click(screen.getByRole("button", { name: /update post/i }));
     await waitFor(() => expect(axios.put).toHaveBeenCalled());
-    expect(axios.put.mock.calls[0][1]).toEqual({ title: "Renamed", content: "Content 1", tags: ["a"] });
+    expect(axios.put.mock.calls[0][1]).toEqual({
+      title: "Renamed",
+      content: "Content 1",
+      tags: ["a"],
+      status: "published",
+    });
     expect(await screen.findByTestId("where")).toHaveTextContent("/post/p1");
   });
 

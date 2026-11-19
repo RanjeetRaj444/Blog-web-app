@@ -3,8 +3,12 @@ const User = require("../models/User.js");
 const auth = require("../middleware/auth.js");
 const { validateRegister, validateLogin } = require("../middleware/validate.js");
 const { signToken } = require("../utils/token.js");
+const { isPasswordBreached } = require("../utils/pwned.js");
 
 const router = express.Router();
+
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCK_MINUTES = 15;
 
 const authResponse = (user) => ({
   token: signToken(user.id),
@@ -17,6 +21,12 @@ router.post("/register", validateRegister, async (req, res) => {
 
     if (await User.findOne({ email })) {
       return res.status(400).json({ message: "User already exists" });
+    }
+    if (await isPasswordBreached(password)) {
+      return res.status(400).json({
+        message:
+          "This password has appeared in a data breach. Please choose a different one.",
+      });
     }
 
     const user = await User.create({ name, email, password });
@@ -32,8 +42,50 @@ router.post("/login", validateLogin, async (req, res) => {
     const { email, password } = req.body;
 
     const user = await User.findOne({ email });
+    const now = Date.now();
+
+    if (user && user.lockUntil && user.lockUntil.getTime() > now) {
+      const minutes = Math.ceil((user.lockUntil.getTime() - now) / 60000);
+      return res.status(429).json({
+        message: `Too many failed attempts. Try again in ${minutes} minutes.`,
+      });
+    }
+
+    // Unknown emails behave exactly like a wrong password.
     if (!user || !(await user.comparePassword(password))) {
+      if (user) {
+        // An expired lock starts a fresh count.
+        if (user.lockUntil) {
+          await User.updateOne(
+            { _id: user._id },
+            { $set: { failedLoginAttempts: 0 }, $unset: { lockUntil: 1 } }
+          );
+        }
+        const updated = await User.findByIdAndUpdate(
+          user._id,
+          { $inc: { failedLoginAttempts: 1 } },
+          { new: true }
+        );
+        if (updated.failedLoginAttempts >= MAX_FAILED_ATTEMPTS) {
+          await User.updateOne(
+            { _id: user._id },
+            {
+              $set: {
+                failedLoginAttempts: 0,
+                lockUntil: new Date(Date.now() + LOCK_MINUTES * 60000),
+              },
+            }
+          );
+        }
+      }
       return res.status(400).json({ message: "Invalid credentials" });
+    }
+
+    if (user.failedLoginAttempts || user.lockUntil) {
+      await User.updateOne(
+        { _id: user._id },
+        { $set: { failedLoginAttempts: 0 }, $unset: { lockUntil: 1 } }
+      );
     }
 
     res.json(authResponse(user));
@@ -45,7 +97,9 @@ router.post("/login", validateLogin, async (req, res) => {
 
 router.get("/user", auth, async (req, res) => {
   try {
-    const user = await User.findById(req.user.user.id).select("-password");
+    const user = await User.findById(req.user.user.id).select(
+      "-password -bookmarks -failedLoginAttempts -lockUntil"
+    );
     if (!user) return res.status(401).json({ message: "User no longer exists" });
     res.json(user);
   } catch (err) {

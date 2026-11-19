@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://panini8blogplateform.netlify.app/sitemap.xml

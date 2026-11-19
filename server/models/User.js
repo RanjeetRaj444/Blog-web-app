@@ -23,6 +23,20 @@ const UserSchema = new mongoose.Schema({
     type: String,
     default: "",
   },
+  failedLoginAttempts: {
+    type: Number,
+    default: 0,
+  },
+  lockUntil: {
+    type: Date,
+  },
+  // Ordered oldest -> newest; the API lists newest first.
+  bookmarks: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Post",
+    },
+  ],
   createdAt: {
     type: Date,
     default: Date.now,

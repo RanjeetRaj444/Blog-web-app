@@ -16,7 +16,10 @@ router.get("/:id/public", validateObjectId("id"), async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-    const posts = await Post.find({ author: req.params.id })
+    const posts = await Post.find({
+      author: req.params.id,
+      status: { $ne: "draft" },
+    })
       .sort({ createdAt: -1 })
       .limit(50)
       .populate("author", "name")
@@ -33,7 +36,9 @@ router.get("/:id", auth, validateObjectId("id"), async (req, res) => {
   try {
     const isSelf = req.params.id === req.user.user.id;
     const user = await User.findById(req.params.id).select(
-      isSelf ? "-password" : "name bio createdAt"
+      isSelf
+        ? "-password -bookmarks -failedLoginAttempts -lockUntil"
+        : "name bio createdAt"
     );
 
     if (!user) {
@@ -62,7 +67,7 @@ router.put(
         req.params.id,
         { $set: req.body },
         { new: true }
-      ).select("-password");
+      ).select("-password -bookmarks -failedLoginAttempts -lockUntil");
 
       res.json(user);
     } catch (err) {
@@ -83,7 +88,8 @@ router.get("/:id/posts", auth, validateObjectId("id"), async (req, res) => {
       .populate("author", "name")
       .lean();
 
-    res.json(posts);
+    // Own list includes drafts; old documents without a status are published.
+    res.json(posts.map((p) => ({ ...p, status: p.status || "published" })));
   } catch (err) {
     console.error(err.message);
     res.status(500).json({ message: "Server Error" });

@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import { ArrowLeft, Trash2 } from "lucide-react";
 import axios from "axios";
 import { toast } from "react-hot-toast";
-import { API_URL, getErrorMessage } from "../utils/constants";
+import { getErrorMessage } from "../utils/constants";
 import { AuthContext } from "../context/AuthContext";
 import usePageTitle from "../hooks/usePageTitle";
 import PostForm from "../components/posts/PostForm";
@@ -25,12 +25,7 @@ const EditPost = () => {
     const fetchPost = async () => {
       try {
         setIsLoading(true);
-        const response = await axios.get(`${API_URL}/api/posts/${id}`, {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const response = await axios.get(`/api/posts/${id}`);
         setPost(response.data);
       } catch (err) {
         setError(
@@ -52,13 +47,10 @@ const EditPost = () => {
   const handleSubmit = async (data) => {
     try {
       setIsSubmitting(true);
-      await axios.put(`${API_URL}/api/posts/${id}`, data, {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      toast.success("Post updated successfully!");
+      await axios.put(`/api/posts/${id}`, data);
+      toast.success(
+        data.status === "draft" ? "Draft saved!" : "Post updated successfully!"
+      );
       navigate(`/post/${id}`);
     } catch (error) {
       console.error("Error updating post:", error);
@@ -76,12 +68,7 @@ const EditPost = () => {
     ) {
       try {
         setIsDeleting(true);
-        await axios.delete(`${API_URL}/api/posts/${id}`, {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        await axios.delete(`/api/posts/${id}`);
         toast.success("Post deleted successfully!");
         navigate("/");
       } catch (error) {
@@ -154,6 +141,7 @@ const EditPost = () => {
                 title: post.title,
                 content: post.content,
                 tags: post.tags,
+                status: post.status,
               }}
               onSubmit={handleSubmit}
               isSubmitting={isSubmitting}

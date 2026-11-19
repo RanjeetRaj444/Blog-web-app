@@ -1,25 +1,38 @@
 import { useContext, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
-import { Heart, MessageCircle, Edit, Trash2 } from "lucide-react";
+import { Heart, MessageCircle, Edit, Trash2, Bookmark } from "lucide-react";
+import axios from "axios";
 import { toast } from "react-hot-toast";
 import { AuthContext } from "../../context/AuthContext";
+import { getErrorMessage } from "../../utils/constants";
 
 const likedByUser = (post, userId) =>
   Boolean(post.isLikedByCurrentUser) ||
   (userId && (post.likes || []).some((id) => String(id) === String(userId)));
 
-const PostCard = ({ post, isOwner = false, onDelete, onLike }) => {
+const PostCard = ({
+  post,
+  isOwner = false,
+  onDelete,
+  onLike,
+  onBookmarkChange,
+}) => {
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
   const [isLiked, setIsLiked] = useState(() => likedByUser(post, user?._id));
   const [likesCount, setLikesCount] = useState(post.likes?.length || 0);
   const [isLiking, setIsLiking] = useState(false);
+  const [isBookmarked, setIsBookmarked] = useState(
+    Boolean(post.isBookmarkedByCurrentUser)
+  );
+  const [isBookmarking, setIsBookmarking] = useState(false);
 
   // Re-sync when the post data or the logged-in user changes (e.g. after login).
   useEffect(() => {
     setIsLiked(likedByUser(post, user?._id));
     setLikesCount(post.likes?.length || 0);
+    setIsBookmarked(Boolean(post.isBookmarkedByCurrentUser));
   }, [post, user?._id]);
 
   const canManage = isOwner || (user && post.author?._id === user._id);
@@ -47,6 +60,30 @@ const PostCard = ({ post, isOwner = false, onDelete, onLike }) => {
     }
   };
 
+  const handleBookmark = async () => {
+    if (!user) {
+      toast.error("Please log in to bookmark posts.");
+      navigate("/login");
+      return;
+    }
+    if (isBookmarking) return;
+
+    const was = isBookmarked;
+    setIsBookmarking(true);
+    setIsBookmarked(!was);
+    try {
+      const res = await axios.post(`/api/posts/${post._id}/bookmark`);
+      const now = typeof res?.data?.bookmarked === "boolean" ? res.data.bookmarked : !was;
+      setIsBookmarked(now);
+      onBookmarkChange?.(post._id, now);
+    } catch (err) {
+      setIsBookmarked(was);
+      toast.error(getErrorMessage(err, "Failed to update bookmark."));
+    } finally {
+      setIsBookmarking(false);
+    }
+  };
+
   const handleDelete = () => {
     if (
       onDelete &&
@@ -66,6 +103,11 @@ const PostCard = ({ post, isOwner = false, onDelete, onLike }) => {
                 {post.title}
               </h3>
             </Link>
+            {post.status === "draft" && (
+              <span className="inline-block mt-1 px-2 py-0.5 text-xs font-medium rounded bg-yellow-100 text-yellow-800">
+                Draft
+              </span>
+            )}
             <p className="text-sm text-gray-500 mt-1">
               By{" "}
               {post.author?._id ? (
@@ -140,6 +182,19 @@ const PostCard = ({ post, isOwner = false, onDelete, onLike }) => {
               <MessageCircle size={18} />
               <span>{post.comments?.length || 0}</span>
             </Link>
+
+            <button
+              onClick={handleBookmark}
+              aria-label={isBookmarked ? "Remove bookmark" : "Bookmark post"}
+              aria-pressed={isBookmarked}
+              className={`flex items-center ${
+                isBookmarked
+                  ? "text-primary-600"
+                  : "text-gray-500 hover:text-primary-600"
+              } transition-colors`}
+            >
+              <Bookmark size={18} fill={isBookmarked ? "currentColor" : "none"} />
+            </button>
           </div>
 
           <Link

@@ -46,6 +46,11 @@ const PostSchema = new mongoose.Schema({
     },
   ],
   comments: [CommentSchema],
+  status: {
+    type: String,
+    enum: ["published", "draft"],
+    default: "published",
+  },
   createdAt: {
     type: Date,
     default: Date.now,
@@ -64,6 +69,7 @@ PostSchema.pre("save", function (next) {
 PostSchema.index({ createdAt: -1 });
 PostSchema.index({ tags: 1 });
 PostSchema.index({ author: 1, createdAt: -1 });
+PostSchema.index({ status: 1, createdAt: -1 });
 
 const Post = mongoose.model("Post", PostSchema);
 

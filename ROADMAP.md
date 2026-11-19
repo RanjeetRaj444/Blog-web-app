@@ -14,7 +14,7 @@ Each phase is independently shippable. Every change must keep CI green
 
 ## Phase 1 - Security hardening (~2-3 days)
 - [ ] Move the JWT from `localStorage` to an httpOnly, SameSite cookie + CSRF protection (or short-lived access + refresh token).
-- [~] Password rules: 8+ chars and login/register rate limits done; breached-password check and per-account lockout not done.
+- [x] Password rules: 8+ chars, breached-password check (HaveIBeenPwned k-anonymity, fails open), per-account lockout (5 failures -> 15 min), and rate limits.
 - [ ] Email verification and password reset flow.
 - [ ] Sanitise/limit post content server-side if rich text or Markdown is added (use `sanitize-html` / DOMPurify).
 - [x] NoSQL-injection sanitiser (own middleware), request-ID logging, structured logs (`pino`).
@@ -23,7 +23,7 @@ Each phase is independently shippable. Every change must keep CI green
 ## Phase 2 - Reliability & quality (~3 days)
 - [x] End-to-end tests with Playwright against a real server + in-memory Mongo (register -> post -> like -> comment -> logout).
 - [x] Coverage reporting (`vitest --coverage`), target 80% server / 70% client; fail CI below target.
-- [~] 401 -> auto-logout interceptor done; per-page header code not yet replaced by a shared axios instance.
+- [x] Shared API layer (`src/utils/api.js`: base URL + auth header) and 401 -> auto-logout.
 - [x] Error boundary + friendly offline / Render cold-start message ("server is waking up").
 - [~] `/healthz` with DB status done (used by render.yaml); uptime monitor (UptimeRobot) still to be set up by you.
 - [~] Indexes on `Post.createdAt/tags/author` added; confirm the unique `User.email` index exists in production.
@@ -33,16 +33,16 @@ Each phase is independently shippable. Every change must keep CI green
 - [x] Search (title/content/tags, regex-based, not a text index) and sort by newest/oldest/popular.
 - [~] Edit/delete own comments done; reply threads and comment pagination not done.
 - [~] Public author pages (`/u/:id`) done; follow system not done.
-- [ ] Drafts and scheduled publishing; post slugs for SEO-friendly URLs.
-- [ ] Bookmarks / "posts I liked" page.
+- [~] Drafts done (private to author, publish via edit); scheduled publishing and slugs not done.
+- [x] Bookmarks (toggle, `/bookmarks` page). A "posts I liked" page is not done.
 - [ ] Chatbot upgrades: streaming replies, conversation persistence, "help me write this post" context from the current draft, per-user daily quota.
 
 ## Phase 4 - UX, accessibility, performance (~1 week)
 - [~] Skip link, labels, page titles done; formal audit (contrast, axe in Playwright) not done.
-- [~] Likes are optimistic with revert and errors toast; skeleton loaders not done.
-- [ ] Image lazy-loading, route-level code splitting (already lazy), bundle-size budget in CI.
-- [~] Per-route page titles done; OpenGraph tags and sitemap not done.
-- [ ] Dark mode; mobile polish of the chat widget.
+- [x] Skeleton loaders, optimistic likes/bookmarks with revert, error toasts.
+- [x] Route-level code splitting and bundle-size budget in CI (no images yet, so no lazy-loading needed).
+- [x] Per-route titles/meta, OpenGraph/Twitter tags, `robots.txt`, server-generated `/sitemap.xml` (proxied by Netlify).
+- [~] Chat widget mobile polish done; dark mode not done.
 
 ## Phase 5 - Delivery & operations (~2 days)
 - [~] `render.yaml` and `netlify.toml` ready; you must connect the repos in Render/Netlify to enable auto-deploy and PR previews.
@@ -65,8 +65,8 @@ Phase 0 -> Phase 1 (cookies + reset flow) -> Phase 2 (E2E + coverage) -> Phase 3
 
 ## Status (latest)
 Legend: [x] done and tested, [~] partly done (see note), [ ] not started.
-Verified: server 25 tests (~90% line coverage), client 72 tests (~95%), 13 Playwright browser tests, lint and build clean.
-Needs your accounts/decisions (not doable from code): revoke the leaked key and set Render env vars, scrub git history, branch protection,
-Sentry, Cloudinary, email verification/password reset (needs an email provider), staging environment.
+Verified: server 46 tests (~92% line coverage), client 105 tests (~97%), 18 Playwright browser tests, lint, build and bundle budget clean.
+Needs your accounts/decisions (not doable from code): revoke the leaked key (if not yet), scrub git history, branch protection,
+uptime monitor, Sentry, Cloudinary, email verification/password reset (needs an email provider), staging environment, connect Render/Netlify auto-deploy.
 Cookie auth is deliberately deferred: browsers block cross-site cookies between Netlify and Render; revisit with a shared parent domain.
-Not started: drafts/scheduling, slugs, bookmarks, chatbot streaming/persistence, dark mode, image lazy-loading, bundle-size budget.
+Not started: reply threads, comment pagination, follow system, slugs/scheduling, chatbot streaming/persistence, dark mode, "posts I liked" page, axe accessibility audit.

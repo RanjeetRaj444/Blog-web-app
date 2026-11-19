@@ -1,7 +1,7 @@
 import { createContext, useState, useEffect } from "react";
 import axios from "axios";
 import { toast } from "react-hot-toast";
-import { API_URL } from "../utils/constants";
+import "../utils/api";
 
 export const AuthContext = createContext({
   user: null,
@@ -29,9 +29,7 @@ export const AuthProvider = ({ children }) => {
     const loadUser = async () => {
       if (token) {
         try {
-          const response = await axios.get(`${API_URL}/api/auth/user`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
+          const response = await axios.get("/api/auth/user");
           if (ignore) return;
           setUser(response.data);
         } catch (error) {
@@ -76,7 +74,7 @@ export const AuthProvider = ({ children }) => {
 
   // login/register throw on failure so callers can show the server's message.
   const login = async (email, password) => {
-    const response = await axios.post(`${API_URL}/api/auth/login`, {
+    const response = await axios.post("/api/auth/login", {
       email,
       password,
     });
@@ -84,7 +82,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const register = async (name, email, password) => {
-    const response = await axios.post(`${API_URL}/api/auth/register`, {
+    const response = await axios.post("/api/auth/register", {
       name,
       email,
       password,

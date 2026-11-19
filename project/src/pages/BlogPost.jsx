@@ -1,13 +1,13 @@
 import { useState, useEffect, useContext } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
-import { Heart, Edit, ArrowLeft } from "lucide-react";
+import { Heart, Edit, ArrowLeft, Bookmark } from "lucide-react";
 import axios from "axios";
 import { toast } from "react-hot-toast";
-import { API_URL, getErrorMessage } from "../utils/constants";
+import { getErrorMessage } from "../utils/constants";
 import { AuthContext } from "../context/AuthContext";
 import CommentSection from "../components/comments/CommentSection";
-import LoadingSpinner from "../components/ui/LoadingSpinner";
+import { PostPageSkeleton } from "../components/ui/Skeleton";
 import Button from "../components/ui/Button";
 import Markdown from "../components/ui/Markdown";
 import usePageTitle from "../hooks/usePageTitle";
@@ -21,8 +21,10 @@ const BlogPost = () => {
   const [isLiked, setIsLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
   const [isLiking, setIsLiking] = useState(false);
+  const [isBookmarked, setIsBookmarked] = useState(false);
+  const [isBookmarking, setIsBookmarking] = useState(false);
   const { user, token } = useContext(AuthContext);
-  usePageTitle(post?.title);
+  usePageTitle(post?.title, post?.content);
 
   useEffect(() => {
     let ignore = false;
@@ -30,9 +32,7 @@ const BlogPost = () => {
       try {
         setIsLoading(true);
         setError(null);
-        const response = await axios.get(`${API_URL}/api/posts/${id}`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
+        const response = await axios.get(`/api/posts/${id}`);
         if (ignore) return;
         const data = response.data;
         setPost(data);
@@ -43,6 +43,7 @@ const BlogPost = () => {
             )
         );
         setLikesCount(data.likes?.length || 0);
+        setIsBookmarked(Boolean(data.isBookmarkedByCurrentUser));
       } catch (err) {
         if (ignore) return;
         setPost(null);
@@ -63,8 +64,6 @@ const BlogPost = () => {
     };
   }, [id, token, user]);
 
-  const authHeaders = { Authorization: `Bearer ${token}` };
-
   const handleLike = async () => {
     if (!user) {
       toast.error("Please log in to like posts.");
@@ -74,11 +73,7 @@ const BlogPost = () => {
     if (isLiking) return;
     setIsLiking(true);
     try {
-      const response = await axios.post(
-        `${API_URL}/api/posts/${id}/like`,
-        {},
-        { headers: authHeaders }
-      );
+      const response = await axios.post(`/api/posts/${id}/like`);
       setLikesCount(response.data.length);
       setIsLiked(response.data.some((l) => String(l) === user._id));
     } catch (err) {
@@ -89,14 +84,35 @@ const BlogPost = () => {
     }
   };
 
+  const handleBookmark = async () => {
+    if (!user) {
+      toast.error("Please log in to bookmark posts.");
+      navigate("/login");
+      return;
+    }
+    if (isBookmarking) return;
+    const was = isBookmarked;
+    setIsBookmarking(true);
+    setIsBookmarked(!was);
+    try {
+      const response = await axios.post(`/api/posts/${id}/bookmark`);
+      if (typeof response?.data?.bookmarked === "boolean") {
+        setIsBookmarked(response.data.bookmarked);
+      }
+    } catch (err) {
+      setIsBookmarked(was);
+      toast.error(getErrorMessage(err, "Failed to update bookmark."));
+    } finally {
+      setIsBookmarking(false);
+    }
+  };
+
   // Both handlers return the updated comment list from the server and throw on failure.
   const handleAddComment = async (postId, content) => {
     try {
-      const response = await axios.post(
-        `${API_URL}/api/posts/${postId}/comments`,
-        { content },
-        { headers: authHeaders }
-      );
+      const response = await axios.post(`/api/posts/${postId}/comments`, {
+        content,
+      });
       return response.data;
     } catch (err) {
       toast.error(getErrorMessage(err, "Failed to add comment."));
@@ -107,9 +123,8 @@ const BlogPost = () => {
   const handleEditComment = async (postId, commentId, content) => {
     try {
       const response = await axios.put(
-        `${API_URL}/api/posts/${postId}/comments/${commentId}`,
-        { content },
-        { headers: authHeaders }
+        `/api/posts/${postId}/comments/${commentId}`,
+        { content }
       );
       return response.data;
     } catch (err) {
@@ -121,8 +136,7 @@ const BlogPost = () => {
   const handleDeleteComment = async (postId, commentId) => {
     try {
       const response = await axios.delete(
-        `${API_URL}/api/posts/${postId}/comments/${commentId}`,
-        { headers: authHeaders }
+        `/api/posts/${postId}/comments/${commentId}`
       );
       return response.data;
     } catch (err) {
@@ -132,11 +146,7 @@ const BlogPost = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-screen">
-        <LoadingSpinner size="large" />
-      </div>
-    );
+    return <PostPageSkeleton />;
   }
 
   if (error || !post) {
@@ -221,7 +231,7 @@ const BlogPost = () => {
               ))}
             </div>
 
-            <div className="border-t border-gray-100 pt-6">
+            <div className="border-t border-gray-100 pt-6 flex items-center gap-2">
               <Button
                 onClick={handleLike}
                 variant="ghost"
@@ -237,6 +247,22 @@ const BlogPost = () => {
                 />
                 <span>{isLiked ? "Liked" : "Like"}</span>
                 <span className="ml-2">({likesCount})</span>
+              </Button>
+              <Button
+                onClick={handleBookmark}
+                variant="ghost"
+                disabled={isBookmarking}
+                aria-pressed={isBookmarked}
+                className={`flex items-center ${
+                  isBookmarked ? "text-primary-600" : "text-gray-700"
+                }`}
+              >
+                <Bookmark
+                  size={20}
+                  fill={isBookmarked ? "currentColor" : "none"}
+                  className="mr-2"
+                />
+                <span>{isBookmarked ? "Bookmarked" : "Bookmark"}</span>
               </Button>
             </div>
 

@@ -17,8 +17,11 @@ const PostForm = ({ initialData, onSubmit, isSubmitting }) => {
       title: initialData?.title || '',
       content: initialData?.content || '',
       tags: '',
+      asDraft: initialData?.status === 'draft',
     }
   });
+
+  const asDraft = watch('asDraft');
 
   const handleAddTag = () => {
     const tag = tagInput.trim();
@@ -44,6 +47,7 @@ const PostForm = ({ initialData, onSubmit, isSubmitting }) => {
       title: data.title,
       content: data.content,
       tags,
+      status: data.asDraft ? 'draft' : 'published',
     });
   };
 
@@ -159,13 +163,21 @@ const PostForm = ({ initialData, onSubmit, isSubmitting }) => {
         </div>
       </div>
       
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between">
+        <label className="flex items-center text-sm text-gray-700 cursor-pointer">
+          <input
+            type="checkbox"
+            className="mr-2 h-4 w-4"
+            {...register('asDraft')}
+          />
+          Save as draft
+        </label>
         <Button 
           type="submit" 
           variant="primary"
           isLoading={isSubmitting}
         >
-          {initialData ? 'Update Post' : 'Create Post'}
+          {asDraft ? 'Save Draft' : initialData ? 'Update Post' : 'Create Post'}
         </Button>
       </div>
     </form>

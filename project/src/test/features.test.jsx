@@ -246,9 +246,8 @@ describe("comment editing", () => {
     expect(await screen.findByText("(edited)")).toBeInTheDocument();
     expect(screen.getByText(/better/)).toBeInTheDocument();
     expect(axios.put).toHaveBeenCalledWith(
-      expect.stringContaining("/api/posts/p1/comments/c1"),
-      { content: "better" },
-      { headers: { Authorization: "Bearer tok" } }
+      "/api/posts/p1/comments/c1",
+      { content: "better" }
     );
   });
 

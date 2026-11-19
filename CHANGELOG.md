@@ -3,6 +3,11 @@
 Format: [Keep a Changelog](https://keepachangelog.com), versioning: [SemVer](https://semver.org).
 
 ## [Unreleased]
+### Added
+- Drafts (private to the author), bookmarks and `/bookmarks` page, `/sitemap.xml`, robots.txt, SEO/OpenGraph meta.
+- Per-account login lockout and breached-password check on registration.
+- Shared API layer, skeleton loaders, mobile chat widget, bundle-size budget in CI.
+- Browser tests for comment editing, author pages, bookmarks, drafts and lockout.
 
 ## [0.2.0]
 ### Added

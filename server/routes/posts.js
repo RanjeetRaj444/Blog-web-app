@@ -1,5 +1,6 @@
 const express = require("express");
 const Post = require("../models/Post.js");
+const User = require("../models/User.js");
 const auth = require("../middleware/auth.js");
 const { optionalAuth } = auth;
 const {
@@ -14,9 +15,25 @@ const MAX_COMMENTS_PER_POST = 500;
 
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-const markLiked = (post, userId) => {
+// Old documents may have no status; treat them as published.
+const NOT_DRAFT = { $ne: "draft" };
+
+const authorId = (post) => String(post.author?._id || post.author);
+
+// A draft is visible only to its author.
+const isHiddenDraft = (post, userId) =>
+  post.status === "draft" && authorId(post) !== userId;
+
+const getBookmarkSet = async (userId) => {
+  if (!userId) return new Set();
+  const user = await User.findById(userId).select("bookmarks").lean();
+  return new Set((user?.bookmarks || []).map(String));
+};
+
+const markFlags = (post, userId, bookmarks) => {
   if (userId) {
     post.isLikedByCurrentUser = post.likes.some((l) => l.toString() === userId);
+    post.isBookmarkedByCurrentUser = bookmarks.has(String(post._id));
   }
 };
 
@@ -26,7 +43,7 @@ router.get("/", optionalAuth, async (req, res) => {
   try {
     const page = Math.max(parseInt(req.query.page) || 1, 1);
     const limit = Math.min(Math.max(parseInt(req.query.limit) || 12, 1), 50);
-    const filter = {};
+    const filter = { status: NOT_DRAFT };
     if (typeof req.query.tag === "string" && req.query.tag) {
       filter.tags = req.query.tag;
     }
@@ -66,7 +83,8 @@ router.get("/", optionalAuth, async (req, res) => {
     ]);
 
     const userId = req.user?.user?.id;
-    posts.forEach((post) => markLiked(post, userId));
+    const bookmarks = await getBookmarkSet(userId);
+    posts.forEach((post) => markFlags(post, userId, bookmarks));
 
     res.json({ posts, page, pages: Math.ceil(total / limit), total });
   } catch (err) {
@@ -77,8 +95,29 @@ router.get("/", optionalAuth, async (req, res) => {
 
 router.get("/tags", async (req, res) => {
   try {
-    const tags = await Post.distinct("tags");
+    const tags = await Post.distinct("tags", { status: NOT_DRAFT });
     res.json(tags.sort());
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ message: "Server Error" });
+  }
+});
+
+// Bookmarked published posts, newest bookmark first. Must stay above "/:id".
+router.get("/bookmarks", auth, async (req, res) => {
+  try {
+    const userId = req.user.user.id;
+    const user = await User.findById(userId).select("bookmarks").lean();
+    const ids = [...(user?.bookmarks || [])].reverse();
+    const found = await Post.find({ _id: { $in: ids }, status: NOT_DRAFT })
+      .populate("author", "name")
+      .lean();
+    const byId = new Map(found.map((p) => [String(p._id), p]));
+    // Posts deleted since bookmarking are simply skipped.
+    const posts = ids.map((id) => byId.get(String(id))).filter(Boolean);
+    const bookmarks = new Set(ids.map(String));
+    posts.forEach((post) => markFlags(post, userId, bookmarks));
+    res.json(posts);
   } catch (err) {
     console.error(err.message);
     res.status(500).json({ message: "Server Error" });
@@ -92,11 +131,12 @@ router.get("/:id", optionalAuth, validateObjectId("id"), async (req, res) => {
       .populate("comments.author", "name")
       .lean();
 
-    if (!post) {
+    const userId = req.user?.user?.id;
+    if (!post || isHiddenDraft(post, userId)) {
       return res.status(404).json({ message: "Post not found" });
     }
 
-    markLiked(post, req.user?.user?.id);
+    markFlags(post, userId, await getBookmarkSet(userId));
     res.json(post);
   } catch (err) {
     console.error(err.message);
@@ -106,12 +146,13 @@ router.get("/:id", optionalAuth, validateObjectId("id"), async (req, res) => {
 
 router.post("/", auth, validatePost, async (req, res) => {
   try {
-    const { title, content, tags } = req.body;
+    const { title, content, tags, status } = req.body;
 
     const post = await Post.create({
       title,
       content,
       tags,
+      ...(status ? { status } : {}),
       author: req.user.user.id,
     });
     await post.populate("author", "name");
@@ -130,7 +171,7 @@ router.put(
   validatePost,
   async (req, res) => {
     try {
-      const { title, content, tags } = req.body;
+      const { title, content, tags, status } = req.body;
 
       const post = await Post.findById(req.params.id);
       if (!post) {
@@ -143,6 +184,7 @@ router.put(
       post.title = title;
       post.content = content;
       post.tags = tags;
+      if (status) post.status = status;
       await post.save();
       await post.populate("author", "name");
 
@@ -176,8 +218,10 @@ router.delete("/:id", auth, validateObjectId("id"), async (req, res) => {
 router.post("/:id/like", auth, validateObjectId("id"), async (req, res) => {
   try {
     const userId = req.user.user.id;
-    const existing = await Post.findById(req.params.id).select("likes");
-    if (!existing) {
+    const existing = await Post.findById(req.params.id).select(
+      "likes status author"
+    );
+    if (!existing || isHiddenDraft(existing, userId)) {
       return res.status(404).json({ message: "Post not found" });
     }
 
@@ -195,6 +239,31 @@ router.post("/:id/like", auth, validateObjectId("id"), async (req, res) => {
   }
 });
 
+// Toggle a bookmark; responds with the new state.
+router.post("/:id/bookmark", auth, validateObjectId("id"), async (req, res) => {
+  try {
+    const userId = req.user.user.id;
+    const post = await Post.findById(req.params.id).select("status author");
+    if (!post || isHiddenDraft(post, userId)) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    const user = await User.findById(userId).select("bookmarks");
+    if (!user) return res.status(401).json({ message: "User no longer exists" });
+    const bookmarked = !user.bookmarks.some((b) => String(b) === req.params.id);
+    await User.updateOne(
+      { _id: userId },
+      bookmarked
+        ? { $addToSet: { bookmarks: req.params.id } }
+        : { $pull: { bookmarks: req.params.id } }
+    );
+    res.json({ bookmarked });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ message: "Server Error" });
+  }
+});
+
 router.post(
   "/:id/comments",
   auth,
@@ -203,7 +272,7 @@ router.post(
   async (req, res) => {
     try {
       const post = await Post.findById(req.params.id);
-      if (!post) {
+      if (!post || isHiddenDraft(post, req.user.user.id)) {
         return res.status(404).json({ message: "Post not found" });
       }
       if (post.comments.length >= MAX_COMMENTS_PER_POST) {
@@ -235,7 +304,7 @@ router.put(
   async (req, res) => {
     try {
       const post = await Post.findById(req.params.id);
-      if (!post) {
+      if (!post || isHiddenDraft(post, req.user.user.id)) {
         return res.status(404).json({ message: "Post not found" });
       }
       const comment = post.comments.id(req.params.comment_id);
@@ -266,7 +335,7 @@ router.delete(
   async (req, res) => {
     try {
       const post = await Post.findById(req.params.id);
-      if (!post) {
+      if (!post || isHiddenDraft(post, req.user.user.id)) {
         return res.status(404).json({ message: "Post not found" });
       }
 

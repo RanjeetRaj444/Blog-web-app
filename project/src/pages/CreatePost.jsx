@@ -1,10 +1,9 @@
-import { useState, useContext } from "react";
+import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import axios from "axios";
 import { toast } from "react-hot-toast";
-import { API_URL, getErrorMessage } from "../utils/constants";
-import { AuthContext } from "../context/AuthContext";
+import { getErrorMessage } from "../utils/constants";
 import usePageTitle from "../hooks/usePageTitle";
 import PostForm from "../components/posts/PostForm";
 
@@ -12,17 +11,13 @@ const CreatePost = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
   usePageTitle("Create post");
-  const { token } = useContext(AuthContext);
   const handleSubmit = async (data) => {
     try {
       setIsSubmitting(true);
-      await axios.post(`${API_URL}/api/posts`, data, {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      toast.success("Post created successfully!");
+      await axios.post("/api/posts", data);
+      toast.success(
+        data.status === "draft" ? "Draft saved!" : "Post created successfully!"
+      );
       navigate("/");
     } catch (error) {
       console.error("Error creating post:", error);

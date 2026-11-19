@@ -3,11 +3,11 @@ import { User, Settings } from "lucide-react";
 import axios from "axios";
 import { toast } from "react-hot-toast";
 import { Link } from "react-router-dom";
-import { API_URL, getErrorMessage } from "../utils/constants";
+import { getErrorMessage } from "../utils/constants";
 import { AuthContext } from "../context/AuthContext";
 import usePageTitle from "../hooks/usePageTitle";
 import PostCard from "../components/posts/PostCard";
-import LoadingSpinner from "../components/ui/LoadingSpinner";
+import { ProfileSkeleton } from "../components/ui/Skeleton";
 import Button from "../components/ui/Button";
 
 const cardClass = "bg-white rounded-lg shadow-card p-6 animate-fade-in";
@@ -17,7 +17,7 @@ const statLabelClass = "text-gray-600";
 const statValueClass = "font-medium";
 
 const Profile = () => {
-  const { user, token } = useContext(AuthContext);
+  const { user } = useContext(AuthContext);
   usePageTitle("Profile");
   const [posts, setPosts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -36,18 +36,8 @@ const Profile = () => {
     const fetchData = async () => {
       try {
         const [postsRes, profileRes] = await Promise.all([
-          axios.get(`${API_URL}/api/users/${user._id}/posts`, {
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-          }),
-          axios.get(`${API_URL}/api/users/${user._id}`, {
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-          }),
+          axios.get(`/api/users/${user._id}/posts`),
+          axios.get(`/api/users/${user._id}`),
         ]);
         setPosts(postsRes.data);
         setName(profileRes.data.name);
@@ -61,16 +51,11 @@ const Profile = () => {
     };
 
     fetchData();
-  }, [user, token]);
+  }, [user]);
 
   const handleDeletePost = async (postId) => {
     try {
-      await axios.delete(`${API_URL}/api/posts/${postId}`, {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      await axios.delete(`/api/posts/${postId}`);
       setPosts((prev) => prev.filter((post) => post._id !== postId));
       toast.success("Post deleted successfully!");
     } catch (err) {
@@ -80,27 +65,14 @@ const Profile = () => {
   };
 
   const handleLike = async (postId) => {
-    await axios.post(
-      `${API_URL}/api/posts/${postId}/like`,
-      {},
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
+    await axios.post(`/api/posts/${postId}/like`);
   };
 
   const handleProfileUpdate = async (e) => {
     e.preventDefault();
     try {
       setIsSubmitting(true);
-      await axios.put(
-        `${API_URL}/api/users/${user?._id}`,
-        { name, bio },
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      await axios.put(`/api/users/${user?._id}`, { name, bio });
       toast.success("Profile updated successfully!");
       setIsEditMode(false);
     } catch (err) {
@@ -123,11 +95,7 @@ const Profile = () => {
   }, [posts]);
 
   if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-screen">
-        <LoadingSpinner size="large" />
-      </div>
-    );
+    return <ProfileSkeleton />;
   }
 
   if (error) {

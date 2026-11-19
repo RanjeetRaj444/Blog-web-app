@@ -45,6 +45,7 @@ jobs:
       - run: npm run lint
       - run: npm run test:coverage
       - run: npm run build
+      - run: npm run check:bundle
       - run: npm audit --omit=dev --audit-level=high
 
   e2e:

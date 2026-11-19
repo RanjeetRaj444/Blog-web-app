@@ -1,11 +1,10 @@
 import { useState, useEffect, useCallback, useContext } from "react";
 import { Filter, Search } from "lucide-react";
 import axios from "axios";
-import { API_URL } from "../utils/constants";
 import { AuthContext } from "../context/AuthContext";
 import usePageTitle from "../hooks/usePageTitle";
 import PostCard from "../components/posts/PostCard";
-import LoadingSpinner from "../components/ui/LoadingSpinner";
+import { PostListSkeleton } from "../components/ui/Skeleton";
 
 const tagButtonBase = "px-3 py-1.5 rounded-full text-sm font-medium transition";
 const PAGE_SIZE = 12;
@@ -35,15 +34,9 @@ const Home = () => {
     return () => clearTimeout(id);
   }, [searchInput]);
 
-  const authHeaders = useCallback(
-    () => (token ? { Authorization: `Bearer ${token}` } : {}),
-    [token]
-  );
-
   const fetchPage = useCallback(
     async (pageNumber) => {
-      const response = await axios.get(`${API_URL}/api/posts`, {
-        headers: authHeaders(),
+      const response = await axios.get("/api/posts", {
         params: {
           page: pageNumber,
           limit: PAGE_SIZE,
@@ -54,7 +47,7 @@ const Home = () => {
       });
       return response.data;
     },
-    [authHeaders, selectedTag, search, sort]
+    [selectedTag, search, sort]
   );
 
   // First page (re)loads when the filters, search, sort or user change.
@@ -82,11 +75,11 @@ const Home = () => {
     return () => {
       ignore = true;
     };
-  }, [fetchPage, retryCount]);
+  }, [fetchPage, retryCount, token]);
 
   useEffect(() => {
     axios
-      .get(`${API_URL}/api/posts/tags`)
+      .get("/api/posts/tags")
       .then((res) => setAllTags(res.data))
       .catch((err) => console.error("Error loading tags:", err));
   }, []);
@@ -109,31 +102,19 @@ const Home = () => {
     }
   };
 
-  const handleLike = useCallback(
-    async (postId) => {
-      // PostCard reverts its optimistic update if this throws.
-      await axios.post(
-        `${API_URL}/api/posts/${postId}/like`,
-        {},
-        { headers: authHeaders() }
-      );
-    },
-    [authHeaders]
-  );
+  const handleLike = useCallback(async (postId) => {
+    // PostCard reverts its optimistic update if this throws.
+    await axios.post(`/api/posts/${postId}/like`);
+  }, []);
 
-  const handleDelete = useCallback(
-    async (postId) => {
-      try {
-        await axios.delete(`${API_URL}/api/posts/${postId}`, {
-          headers: authHeaders(),
-        });
-        setPosts((prev) => prev.filter((post) => post._id !== postId));
-      } catch (err) {
-        console.error("Error deleting post:", err);
-      }
-    },
-    [authHeaders]
-  );
+  const handleDelete = useCallback(async (postId) => {
+    try {
+      await axios.delete(`/api/posts/${postId}`);
+      setPosts((prev) => prev.filter((post) => post._id !== postId));
+    } catch (err) {
+      console.error("Error deleting post:", err);
+    }
+  }, []);
 
   const toggleFilter = () => setIsFilterOpen((v) => !v);
 
@@ -219,9 +200,7 @@ const Home = () => {
       )}
 
       {isLoading ? (
-        <div className="flex justify-center items-center py-20">
-          <LoadingSpinner size="large" />
-        </div>
+        <PostListSkeleton />
       ) : error && posts.length === 0 ? (
         <div className="text-center py-20" role="alert">
           <p className="text-red-600 mb-2">{error}</p>

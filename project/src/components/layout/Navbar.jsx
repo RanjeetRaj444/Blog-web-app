@@ -1,6 +1,6 @@
 import { useState, useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { PenSquare, Home, User, Menu, X, LogOut } from 'lucide-react';
+import { PenSquare, Home, User, Menu, X, LogOut, Bookmark } from 'lucide-react';
 import { AuthContext } from '../../context/AuthContext';
 
 const Navbar = () => {
@@ -46,6 +46,10 @@ const Navbar = () => {
                   <PenSquare size={18} className="mr-1" />
                   <span>Create Post</span>
                 </Link>
+                <Link to="/bookmarks" className="flex items-center text-gray-700 hover:text-primary-600 transition-colors">
+                  <Bookmark size={18} className="mr-1" />
+                  <span>Bookmarks</span>
+                </Link>
                 <Link to="/profile" className="flex items-center text-gray-700 hover:text-primary-600 transition-colors">
                   <User size={18} className="mr-1" />
                   <span>Profile</span>
@@ -67,7 +71,7 @@ const Navbar = () => {
           </div>
 
           <div className="md:hidden">
-            <button onClick={toggleMenu} className="p-2 text-gray-700 hover:text-primary-600 focus:outline-none">
+            <button onClick={toggleMenu} aria-label="Toggle menu" aria-expanded={isMenuOpen} className="p-2 text-gray-700 hover:text-primary-600 focus:outline-none">
               {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
           </div>
@@ -98,6 +102,16 @@ const Navbar = () => {
                   <div className="flex items-center">
                     <PenSquare size={18} className="mr-2" />
                     Create Post
+                  </div>
+                </Link>
+                <Link 
+                  to="/bookmarks" 
+                  className="block py-2 px-4 text-gray-700 hover:bg-gray-100 rounded-md"
+                  onClick={closeMenu}
+                >
+                  <div className="flex items-center">
+                    <Bookmark size={18} className="mr-2" />
+                    Bookmarks
                   </div>
                 </Link>
                 <Link 

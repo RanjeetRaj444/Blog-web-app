@@ -21,6 +21,17 @@ const ChatBot = ({ isOpen, onClose }) => {
   const messageRef = useRef(null);
   const chatBodyRef = useRef(null);
 
+  // Focus the input when the chat opens; Escape closes it.
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    messageRef.current?.focus();
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") onClose?.();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [isOpen, onClose]);
+
   useEffect(() => {
     if (chatBodyRef.current) {
       chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
@@ -79,8 +90,12 @@ const ChatBot = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-50">
-      <div className="bg-white w-[90vw] sm:w-[350px] md:w-[400px] h-[70vh] rounded-xl shadow-lg flex flex-col border border-gray-300">
+    <div className="fixed inset-x-0 bottom-0 sm:inset-x-auto sm:bottom-4 sm:right-4 z-50">
+      <div
+        role="dialog"
+        aria-label="Chat with Bot"
+        className="bg-white w-full sm:w-[350px] md:w-[400px] h-[80vh] sm:h-[70vh] rounded-t-xl sm:rounded-xl shadow-lg flex flex-col border border-gray-300 pb-[env(safe-area-inset-bottom)]"
+      >
         <div className="flex justify-between items-center px-4 py-2 border-b border-gray-200 bg-primary-600 text-white rounded-t-xl">
           <h2 className="text-lg font-semibold">🤖 Chat with Bot</h2>
           <button
@@ -94,6 +109,9 @@ const ChatBot = ({ isOpen, onClose }) => {
 
         <div
           ref={chatBodyRef}
+          role="log"
+          aria-live="polite"
+          aria-label="Chat messages"
           className="flex-1 overflow-y-auto px-4 py-2 space-y-2 bg-gray-50"
         >
           <div className="text-left">
@@ -125,6 +143,7 @@ const ChatBot = ({ isOpen, onClose }) => {
               ref={messageRef}
               type="text"
               maxLength={1000}
+              aria-label="Type your message"
               placeholder="Type your message..."
               className="flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary-400"
             />

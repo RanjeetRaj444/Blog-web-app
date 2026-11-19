@@ -16,6 +16,7 @@ const CreatePost = lazy(() => import("./pages/CreatePost"));
 const EditPost = lazy(() => import("./pages/EditPost"));
 const Profile = lazy(() => import("./pages/Profile"));
 const AuthorPage = lazy(() => import("./pages/AuthorPage"));
+const Bookmarks = lazy(() => import("./pages/Bookmarks"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 function App() {
@@ -46,6 +47,14 @@ function App() {
                 <Route path="/register" element={<Register />} />
                 <Route path="/post/:id" element={<BlogPost />} />
                 <Route path="/u/:id" element={<AuthorPage />} />
+                <Route
+                  path="/bookmarks"
+                  element={
+                    <ProtectedRoute>
+                      <Bookmarks />
+                    </ProtectedRoute>
+                  }
+                />
                 <Route
                   path="/create"
                   element={

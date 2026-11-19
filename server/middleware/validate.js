@@ -42,10 +42,14 @@ const validatePost = (req, res, next) => {
     return fail(res, "Title is required (max 150 characters)");
   if (!str(content) || str(content).length > 20000)
     return fail(res, "Content is required (max 20000 characters)");
+  const { status } = req.body;
+  if (status !== undefined && status !== "published" && status !== "draft")
+    return fail(res, "Status must be 'published' or 'draft'");
   req.body = {
     title: str(title),
     content: str(content),
     tags: normalizeTags(tags),
+    ...(status !== undefined ? { status } : {}),
   };
   next();
 };
